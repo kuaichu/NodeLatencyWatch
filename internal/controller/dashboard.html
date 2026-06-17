@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Node Latency Watch</title>
+  <style>
+    :root{
+      color-scheme:dark;
+      --bg:#081018;--panel:rgba(15,28,39,.88);--panel2:rgba(19,36,49,.94);
+      --line:rgba(132,162,184,.18);--line2:rgba(132,162,184,.34);
+      --text:#eef7fb;--muted:#8ca0ad;--faint:#5f737f;
+      --green:#20d6a2;--blue:#69b7ff;--yellow:#f4c95d;--red:#ff6b6b;
+      --shadow:0 28px 80px rgba(0,0,0,.42);
+      --mono:"Cascadia Code","SFMono-Regular",Consolas,monospace;
+      --sans:"Segoe UI","Microsoft YaHei UI","PingFang SC",Arial,sans-serif;
+    }
+    *{box-sizing:border-box}
+    html{min-height:100%;background:var(--bg)}
+    body{
+      margin:0;min-height:100vh;color:var(--text);font-family:var(--sans);overflow-x:hidden;letter-spacing:0;
+      background:
+        radial-gradient(circle at 18% 10%,rgba(32,214,162,.2),transparent 31rem),
+        radial-gradient(circle at 82% 18%,rgba(105,183,255,.16),transparent 34rem),
+        linear-gradient(135deg,#071016 0%,#0b1620 46%,#11161d 100%);
+    }
+    body:before{
+      content:"";position:fixed;inset:0;pointer-events:none;
+      background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+      background-size:48px 48px;mask-image:linear-gradient(to bottom,rgba(0,0,0,.86),rgba(0,0,0,.12));
+    }
+    body.modal-open{position:fixed;width:100%;overflow:hidden}
+    button,input,select{font:inherit}
+    button{border:0;color:inherit}
+    .shell{position:relative;z-index:1;width:min(1220px,calc(100vw - 40px));margin:0 auto;padding:28px 0 36px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:20px}
+    .brand{display:flex;align-items:center;gap:14px;min-width:0}
+    .brand-mark{width:42px;height:42px;border-radius:15px;display:grid;place-items:center;color:#04120e;font-weight:900;background:linear-gradient(135deg,#20d6a2,#7be7ff);box-shadow:0 16px 42px rgba(32,214,162,.25)}
+    .eyebrow{margin:0 0 3px;color:var(--muted);font-size:12px;text-transform:uppercase}
+    h1{margin:0;font-size:20px;letter-spacing:0}
+    .top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+    .pill,.btn{min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;backdrop-filter:blur(16px);transition:transform .18s ease,border-color .18s ease,background .18s ease,opacity .18s ease}
+    .pill{display:inline-flex;align-items:center;gap:10px;color:#b7c6cf;font-size:13px;font-weight:650;background:rgba(8,16,24,.58);box-shadow:inset 0 1px 0 rgba(255,255,255,.03)}
+    .pill:before{content:"";width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 18px var(--green)}
+    .btn{cursor:pointer;background:rgba(255,255,255,.045);font-weight:760}
+    .btn:hover{transform:translateY(-1px);border-color:var(--line2)}
+    .btn:disabled{cursor:not-allowed;opacity:.55;transform:none}
+    .btn-primary{color:#04120e;background:linear-gradient(135deg,#20d6a2,#65e9d6);border-color:rgba(101,233,214,.34);box-shadow:0 18px 42px rgba(32,214,162,.2)}
+    .btn-danger{color:#ffd7dc;background:rgba(255,107,107,.1);border-color:rgba(255,107,107,.24)}
+    .profile-rail{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 18px}
+    .profile-chip{min-height:34px;padding:0 14px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.04);color:#95a9b6;font-size:13px;font-weight:760;cursor:pointer;transition:.18s ease}
+    .profile-chip:hover{transform:translateY(-1px);color:#d7e5ec}
+    .profile-chip.active{border-color:rgba(32,214,162,.42);background:rgba(32,214,162,.13);color:#dffcf2}
+    .agent-section{margin-bottom:18px}
+    .agent-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    .agent-card{min-width:0;border:1px solid rgba(132,162,184,.16);border-radius:18px;padding:15px;background:rgba(255,255,255,.04);box-shadow:inset 0 1px 0 rgba(255,255,255,.025);transition:.18s ease}
+    .agent-card.online{border-color:rgba(32,214,162,.34);background:linear-gradient(145deg,rgba(32,214,162,.1),rgba(255,255,255,.035))}
+    .agent-card.stale{border-color:rgba(244,201,93,.28);background:linear-gradient(145deg,rgba(244,201,93,.08),rgba(255,255,255,.03))}
+    .agent-card.offline{border-color:rgba(255,107,107,.22);background:linear-gradient(145deg,rgba(255,107,107,.06),rgba(255,255,255,.025))}
+    .agent-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .agent-name{font-size:15px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .agent-id{margin-top:4px;font-family:var(--mono);font-size:11px;color:#728692;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .agent-state{display:inline-flex;align-items:center;gap:7px;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.055);color:#b8c7d0;font-size:12px;font-weight:850;white-space:nowrap}
+    .agent-state:before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+    .online .agent-state{background:rgba(32,214,162,.14);color:#9ff5d1}.stale .agent-state{background:rgba(244,201,93,.13);color:#f4d98f}.offline .agent-state{background:rgba(255,107,107,.13);color:#ffc7c7}
+    .agent-meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .agent-meta-item{border-top:1px solid rgba(132,162,184,.12);padding-top:8px;min-width:0}
+    .agent-meta-item span{display:block;color:#657684;font-size:11px}.agent-meta-item strong{display:block;margin-top:4px;color:#d9e8ef;font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(320px,.85fr);gap:18px;margin-bottom:18px}
+    .panel{position:relative;overflow:hidden;border:1px solid var(--line);border-radius:26px;background:linear-gradient(145deg,rgba(15,28,39,.92),rgba(8,16,24,.72));box-shadow:var(--shadow);backdrop-filter:blur(22px)}
+    .hero-main{padding:24px 28px}
+    .hero-title{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:22px}
+    .hero-label{color:var(--muted);font-size:13px;margin-bottom:8px}
+    .domain{margin:0;font-family:var(--mono);font-size:clamp(26px,4vw,48px);line-height:1.08;overflow-wrap:anywhere}
+    .subline{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;color:var(--muted)}
+    .sub-chip{border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:rgba(255,255,255,.045);font-size:13px}
+    .metric-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+    .mini-card{min-width:0;border:1px solid var(--line);border-radius:17px;padding:15px;background:rgba(255,255,255,.045)}
+    .mini-card .label{color:var(--muted);font-size:12px;margin-bottom:8px}
+    .mini-card .value{font-family:var(--mono);font-size:22px;font-weight:850;overflow-wrap:anywhere}
+    .mini-card .hint{color:var(--faint);font-size:12px;margin-top:7px}
+    .side-panel{padding:22px;display:flex;flex-direction:column;gap:14px}
+    .side-title,.section-title{display:flex;align-items:end;justify-content:space-between;gap:16px}
+    .side-title h2,.section-title h2{margin:0;font-size:15px}
+    .section-title{margin-bottom:14px}.section-title p{margin:5px 0 0;color:var(--muted);font-size:13px}
+    .status-list{border:1px solid rgba(132,162,184,.12);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.035)}
+    .status-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;padding:12px 14px;border-bottom:1px solid rgba(132,162,184,.12);font-size:13px}
+    .status-row:last-child{border-bottom:0}.status-row span{color:var(--muted)}.status-row strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .section{padding:22px}
+    .table-wrap{overflow:auto;border:1px solid rgba(132,162,184,.14);border-radius:18px;background:rgba(255,255,255,.035)}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th,td{padding:12px 13px;border-bottom:1px solid rgba(132,162,184,.12);text-align:left;vertical-align:middle;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    th{color:var(--muted);font-size:12px;font-weight:760;background:rgba(4,12,18,.26)}
+    tr:last-child td{border-bottom:0}tr:hover td{background:rgba(255,255,255,.025)}
+    .node{font-weight:850}.meta{display:block;margin-top:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+    .latency,.badge{display:inline-flex;align-items:center;min-width:64px;height:24px;padding:0 8px;border-radius:999px;background:rgba(32,214,162,.12);color:#9ff5d1;font-family:var(--mono);font-size:12px}
+    .latency.warn,.badge.warn{background:rgba(244,201,93,.13);color:#f4d98f}.latency.bad,.badge.bad{background:rgba(255,107,107,.13);color:#ffc7c7}.badge.neutral{background:rgba(255,255,255,.06);color:#b8c7d0}
+    .empty{color:var(--muted);padding:26px;text-align:center;border:1px dashed rgba(132,162,184,.22);border-radius:18px;background:rgba(255,255,255,.025)}
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;padding:24px;z-index:10;overscroll-behavior:none}
+    .modal.open{display:flex}
+    .modal-card{width:min(1120px,calc(100vw - 48px));max-height:calc(100vh - 48px);overflow:auto;overscroll-behavior:contain;background:linear-gradient(135deg,#101820,#0f2929);border:1px solid #31546a;border-radius:20px;padding:22px;box-shadow:0 20px 80px rgba(0,0,0,.45)}
+    .modal-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}
+    .modal h2{font-size:22px;margin:0}
+    .settings-layout{display:grid;grid-template-columns:170px minmax(0,1fr);gap:18px;align-items:start}
+    .tabs{position:sticky;top:0;display:grid;gap:6px;border:1px solid var(--line);border-radius:12px;padding:6px;background:rgba(7,16,24,.34)}
+    .tab{padding:10px 11px;color:var(--muted);cursor:pointer;border:1px solid transparent;border-radius:9px;font-weight:760}
+    .tab.active{color:#d8fff0;background:#123325;border-color:#236a4b}.tab:hover{color:var(--text);border-color:#344255}
+    .settings-pane{display:none}.settings-pane.active{display:block}
+    .settings-card{background:rgba(18,24,32,.72);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+    .settings-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+    .settings-card-title{font-weight:850}.small{font-size:12px;color:var(--muted);margin-top:6px}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}.form-grid.compact{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .inline-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .field label{display:block;color:#c7d5e8;font-weight:650;margin-bottom:6px;font-size:13px}
+    .field input,.field select,.field textarea{width:100%;box-sizing:border-box;background:#071018;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:13px var(--mono)}
+    .field textarea{min-height:96px;resize:vertical;line-height:1.55}
+    .field textarea.large{min-height:260px}
+    .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#18c99b;box-shadow:0 0 0 3px rgba(24,201,155,.14)}
+    .editor-card{border:1px solid rgba(132,162,184,.14);border-radius:16px;padding:14px;background:rgba(255,255,255,.035);margin-bottom:10px}
+    .editor-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
+    .editor-title{font-weight:850}.editor-sub{margin-top:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+    .toast{position:fixed;right:18px;bottom:18px;z-index:20;padding:12px 15px;border:1px solid rgba(32,214,162,.45);border-radius:12px;background:#0b1620;color:var(--text);box-shadow:0 18px 50px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:.18s ease;pointer-events:none}
+    .toast.show{opacity:1;transform:translateY(0)}
+    @media(max-width:980px){
+      .shell{width:min(100vw - 24px,1220px);padding-top:18px}.topbar,.hero{grid-template-columns:1fr;display:grid}.agent-grid{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.settings-layout{grid-template-columns:1fr}.form-grid,.form-grid.compact{grid-template-columns:1fr}.modal{padding:12px}.modal-card{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">NL</div>
+        <div>
+          <p class="eyebrow">Node Latency Watch</p>
+          <h1>全节点延迟曲线主控台</h1>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="pill"><span id="liveText">等待刷新</span></div>
+        <button class="btn" id="refreshBtn">刷新订阅</button>
+        <button class="btn" id="reloadBtn">立即刷新</button>
+        <button class="btn btn-primary" id="settingsBtn">管理设置</button>
+      </div>
+    </div>
+
+    <div class="profile-rail" id="categoryRail"></div>
+    <section class="agent-section">
+      <div class="agent-grid" id="agentGrid"></div>
+    </section>
+
+    <div class="hero">
+      <section class="panel hero-main">
+        <div class="hero-title">
+          <div>
+            <div class="hero-label">实时节点池</div>
+            <h2 class="domain" id="heroTitle">-</h2>
+            <div class="subline" id="heroSub"></div>
+          </div>
+        </div>
+        <div class="metric-strip">
+          <div class="mini-card"><div class="label">节点数</div><div class="value" id="nodeCount">0</div><div class="hint">当前订阅解析</div></div>
+          <div class="mini-card"><div class="label">机场数</div><div class="value" id="providerCount">0</div><div class="hint">按分类管理</div></div>
+          <div class="mini-card"><div class="label">在线 Agent</div><div class="value" id="agentCount">0</div><div class="hint">TTL 内上报</div></div>
+          <div class="mini-card"><div class="label">采样间隔</div><div class="value" id="interval">0s</div><div class="hint">Agent 拉取周期</div></div>
+        </div>
+      </section>
+      <aside class="panel side-panel">
+        <div class="side-title">
+          <div>
+            <h2>主控状态</h2>
+            <div class="small" id="updatedAt">等待数据</div>
+          </div>
+        </div>
+        <div class="status-list" id="statusPanel"></div>
+      </aside>
+    </div>
+
+    <section class="panel section">
+      <div class="section-title">
+        <div>
+          <h2>节点矩阵</h2>
+          <p id="matrixHint">按机场分类过滤，展示三网最新 TCP 延迟。</p>
+        </div>
+      </div>
+      <div id="matrix"></div>
+    </section>
+  </div>
+
+  <div class="modal" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2>管理设置</h2>
+          <div class="small">机场分类、Agent 探针和探测参数会写回 config.yaml。</div>
+        </div>
+        <div class="top-actions">
+          <button class="btn" id="modalCancel">关闭</button>
+          <button class="btn btn-primary" id="modalSave">保存当前页</button>
+        </div>
+      </div>
+      <div class="settings-layout">
+        <nav class="tabs">
+          <div class="tab active" data-tab="providers">机场分类</div>
+          <div class="tab" data-tab="agents">Agent 探针</div>
+          <div class="tab" data-tab="probe">探测参数</div>
+        </nav>
+        <div class="settings-content">
+          <section class="settings-pane active" data-pane="providers">
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div>
+                  <div class="settings-card-title">机场订阅</div>
+                  <div class="small">分类用于主界面筛选，订阅链接支持信息页自动追踪。</div>
+                </div>
+                <button class="btn" id="addProviderBtn">新增机场</button>
+              </div>
+              <div id="providerEditor"></div>
+            </div>
+            <div class="settings-card" id="subscriptionWorkbench" style="display:none">
+              <div class="settings-card-head">
+                <div>
+                  <div class="settings-card-title" id="subEditorTitle">订阅内容</div>
+                  <div class="small" id="subEditorHint">读取当前有效订阅，或抓取远程内容后保存为本地覆盖。</div>
+                </div>
+                <div class="inline-actions">
+                  <button class="btn" id="loadSubBtn">读取当前</button>
+                  <button class="btn" id="fetchRemoteSubBtn">抓取远程</button>
+                  <button class="btn btn-primary" id="saveSubContentBtn">保存内容</button>
+                  <button class="btn btn-danger" id="clearSubOverrideBtn">清除覆盖</button>
+                </div>
+              </div>
+              <div class="field"><label>订阅原文</label><textarea class="large" id="subscriptionContent" spellcheck="false"></textarea></div>
+            </div>
+          </section>
+          <section class="settings-pane" data-pane="agents">
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div>
+                  <div class="settings-card-title">Agent 探针</div>
+                  <div class="small">三网机器主动拉任务，主控不需要暴露 Agent 端口。</div>
+                </div>
+                <button class="btn" id="addAgentBtn">新增 Agent</button>
+              </div>
+              <div id="agentEditor"></div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-title">通信 Token</div>
+              <div class="form-grid" style="margin-top:12px">
+                <div class="field"><label>新 Token</label><input id="agentToken" type="password" placeholder="留空则保持不变"></div>
+                <div class="field"><label>Agent TTL（秒）</label><input id="agentTTL" type="number" min="30"></div>
+              </div>
+              <div class="small" id="tokenHint">-</div>
+            </div>
+            <div class="settings-card">
+              <div class="settings-card-head">
+                <div>
+                  <div class="settings-card-title">一键安装 Agent</div>
+                  <div class="small" id="installHint">先新增或选择第一个 Agent，再复制命令到目标机器执行。</div>
+                </div>
+                <button class="btn" id="copyInstallBtn">复制命令</button>
+              </div>
+              <div class="field"><label>Linux systemd 安装命令</label><textarea id="installCommand" readonly spellcheck="false"></textarea></div>
+            </div>
+          </section>
+          <section class="settings-pane" data-pane="probe">
+            <div class="settings-card">
+              <div class="settings-card-title">探测参数</div>
+              <div class="form-grid compact" style="margin-top:12px">
+                <div class="field"><label>间隔（秒）</label><input id="probeInterval" type="number" min="10"></div>
+                <div class="field"><label>超时（秒）</label><input id="probeTimeout" type="number" min="1"></div>
+                <div class="field"><label>尝试次数</label><input id="probeAttempts" type="number" min="1"></div>
+                <div class="field"><label>最大并发</label><input id="probeConcurrency" type="number" min="1"></div>
+                <div class="field"><label>TLS 模式</label><select id="probeTLS"><option value="auto">auto</option><option value="always">always</option><option value="never">never</option></select></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const carriers=[["telecom","电信"],["unicom","联通"],["mobile","移动"],["unknown","未知"]];
+    const $=id=>document.getElementById(id);
+    let adminConfig=null, activeTab='providers', selectedCategory='all', lastOverview=[], matrixCarriers=[], settingsDirty=false, activeSubProviderId='';
+    function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+    function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+    async function apiJSON(url,options){
+      const res=await fetch(url,options);
+      const data=await res.json().catch(()=>({error:'HTTP '+res.status}));
+      if(!res.ok||data.error)throw new Error(data.error||('HTTP '+res.status));
+      return data;
+    }
+    function lockBody(){document.body.dataset.scrollY=String(window.scrollY);document.body.classList.add('modal-open');document.body.style.top='-'+window.scrollY+'px'}
+    function unlockBody(){const y=Number(document.body.dataset.scrollY||0);document.body.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,y)}
+    function showSettings(tab){switchSettingsTab(tab||activeTab);$('settingsModal').classList.add('open');lockBody();if(activeTab==='agents')loadInstallCommand().catch(console.error)}
+    function closeSettings(){$('settingsModal').classList.remove('open');settingsDirty=false;unlockBody();load().catch(console.error)}
+    function markSettingsDirty(){settingsDirty=true}
+    function settingsOpen(){return $('settingsModal').classList.contains('open')}
+    function switchSettingsTab(tab){activeTab=tab;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));document.querySelectorAll('.settings-pane').forEach(x=>x.classList.toggle('active',x.dataset.pane===tab));$('modalSave').textContent=tab==='providers'?'保存机场':'保存 '+(tab==='agents'?'Agent':'探测参数');if(tab==='agents')loadInstallCommand().catch(console.error)}
+    function msCell(sample){if(!sample)return'<span class="latency bad">无数据</span>';if(!sample.success)return'<span class="latency bad">失败</span>';const ms=sample.tcpMs||0;const cls=ms>250?'bad':ms>120?'warn':'';return'<span class="latency '+cls+'">'+ms.toFixed(1)+'ms</span>'}
+    function carrierOptions(selected){return carriers.map(([v,l])=>'<option value="'+v+'" '+(v===selected?'selected':'')+'>'+l+'</option>').join('')}
+    function carrierLabel(value){const found=carriers.find(c=>c[0]===value);return found?found[1]:value}
+    function carriersForAgents(agents){const present=new Set((agents||[]).map(a=>a.carrier||'unknown'));return carriers.filter(c=>present.has(c[0]))}
+    function statusBadge(status){if(status==='online')return'<span class="badge">在线</span>';if(status==='stale')return'<span class="badge warn">过期</span>';return'<span class="badge bad">离线</span>'}
+    function statusLabel(status){return status==='online'?'在线':status==='stale'?'过期':'离线'}
+    async function load(){
+      const [status,overview,cfg,agents,providers]=await Promise.all([
+        fetch('/api/status',{cache:'no-store'}).then(r=>r.json()),
+        fetch('/api/overview',{cache:'no-store'}).then(r=>r.json()),
+        fetch('/api/admin/config',{cache:'no-store'}).then(r=>r.json()),
+        fetch('/api/admin/agents',{cache:'no-store'}).then(r=>r.json()),
+        fetch('/api/admin/providers',{cache:'no-store'}).then(r=>r.json())
+      ]);
+      const editingSettings=settingsOpen()||settingsDirty;
+      if(!editingSettings||!adminConfig)adminConfig=cfg;
+      lastOverview=Array.isArray(overview)?overview:[];
+      matrixCarriers=carriersForAgents(cfg.agents||[]);
+      $('nodeCount').textContent=status.nodeCount||0;$('providerCount').textContent=status.providerCount||0;$('agentCount').textContent=status.agentCount||0;$('interval').textContent=((status.probe&&status.probe.intervalSeconds)||0)+'s';
+      $('liveText').textContent='最后刷新 '+new Date().toLocaleTimeString();$('updatedAt').textContent='更新于 '+new Date().toLocaleTimeString();
+      const cats=[...new Set((cfg.providers||[]).map(p=>p.category||'默认'))].sort();
+      if(selectedCategory!=='all'&&!cats.includes(selectedCategory))selectedCategory='all';
+      renderCategoryRail(cats);renderHero(status,cfg);renderStatus(status);renderAgentsGrid(Array.isArray(agents)?agents.filter(agentVisible):[]);renderMatrix(lastOverview);
+      if(!editingSettings){renderProviders(cfg.providers||[],Array.isArray(providers)?providers:[]);renderAgentEditor(cfg.agents||[]);renderSettings(cfg)}
+    }
+    function renderHero(status,cfg){
+      const label=selectedCategory==='all'?'全部机场':selectedCategory;
+      $('heroTitle').textContent=label;
+      $('heroSub').innerHTML=['机场 '+(status.providerCount||0),'节点 '+(status.nodeCount||0),'订阅版本 '+(status.subscriptionVersion||'-')].map(x=>'<span class="sub-chip">'+escapeHTML(x)+'</span>').join('');
+    }
+    function renderStatus(status){
+      $('statusPanel').innerHTML=[
+        ['订阅版本',status.subscriptionVersion||'-'],
+        ['最近刷新',status.lastRefresh?new Date(status.lastRefresh).toLocaleString():'-'],
+        ['刷新错误',status.lastRefreshError||'无'],
+        ['TLS 模式',status.probe?status.probe.tlsMode:'-']
+      ].map(([k,v])=>'<div class="status-row"><span>'+k+'</span><strong>'+escapeHTML(v)+'</strong></div>').join('');
+    }
+    function renderCategoryRail(cats){
+      $('categoryRail').innerHTML='<button class="profile-chip '+(selectedCategory==='all'?'active':'')+'" data-category="all">全部机场</button>'+cats.map(cat=>'<button class="profile-chip '+(selectedCategory===cat?'active':'')+'" data-category="'+escapeHTML(cat)+'">'+escapeHTML(cat)+'</button>').join('');
+      document.querySelectorAll('[data-category]').forEach(btn=>btn.addEventListener('click',()=>{selectedCategory=btn.dataset.category;renderCategoryRail(cats);renderMatrix(lastOverview);renderHero({providerCount:adminConfig.providers.length,nodeCount:lastOverview.length,subscriptionVersion:adminConfig.subscriptionVersion},adminConfig)}));
+    }
+    function renderAgentsGrid(list){
+      if(!list.length){$('agentGrid').innerHTML='<div class="empty">Agent 首次上报后会在这里自动显示。预配置探针请到“管理设置 / Agent 探针”。</div>';return}
+      $('agentGrid').innerHTML=list.map(a=>'<article class="agent-card '+escapeHTML(a.status||'offline')+'"><div class="agent-head"><div><div class="agent-name">'+escapeHTML(a.name||a.id)+'</div><div class="agent-id">'+escapeHTML(a.id)+'</div></div><div class="agent-state">'+statusLabel(a.status)+'</div></div><div class="agent-meta"><div class="agent-meta-item"><span>线路</span><strong>'+escapeHTML(a.carrierLabel||a.carrier)+'</strong></div><div class="agent-meta-item"><span>结果</span><strong>'+Number(a.resultCount||0)+'</strong></div><div class="agent-meta-item"><span>探测源</span><strong>'+escapeHTML(a.probeSource||'-')+'</strong></div><div class="agent-meta-item"><span>最近上报</span><strong>'+((a.lastSeen&&!String(a.lastSeen).startsWith('0001'))?new Date(a.lastSeen).toLocaleTimeString():'-')+'</strong></div></div></article>').join('');
+    }
+    function agentHasReported(agent){return Boolean(agent&&agent.lastSeen&&!String(agent.lastSeen).startsWith('0001'))}
+    function agentVisible(agent){return Boolean(agent&&agent.configured&&agentHasReported(agent))}
+    function renderMatrix(rows){
+      const filtered=selectedCategory==='all'?rows:rows.filter(r=>(r.node.category||'默认')===selectedCategory);
+      const carrierHint=matrixCarriers.length?(' · '+matrixCarriers.map(c=>c[1]).join(' / ')):' · 未配置 Agent';
+      $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+filtered.length+' 个节点'+carrierHint;
+      if(!filtered.length){$('matrix').innerHTML='<div class="empty">当前分类没有节点。请在管理设置里检查机场订阅。</div>';return}
+      const metricHead=matrixCarriers.map(c=>'<th>'+escapeHTML(c[1])+'</th>').join('')+(matrixCarriers.length?'<th>成功率</th>':'');
+      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const metricCells=matrixCarriers.map(c=>'<td>'+msCell(latest[c[0]])+'</td>').join('')+(matrixCarriers.length?'<td>'+((row.successRate||0).toFixed(0))+'%</td>':'');return'<tr><td><span class="node">'+escapeHTML(row.node.name)+'</span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
+    }
+    function renderProviders(providers,statuses){
+      const counts={};(statuses||[]).forEach(s=>counts[s.id]=s.nodeCount||0);
+      $('providerEditor').innerHTML=providers.length?providers.map((p,i)=>'<div class="editor-card" data-provider-index="'+i+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(p.name||p.id)+'</div><div class="editor-sub">'+escapeHTML(p.id||'')+' · '+escapeHTML(p.category||'默认')+' · 节点 '+Number(counts[p.id]||0)+'</div></div><div class="inline-actions"><button class="btn" data-edit-sub="'+i+'">订阅内容</button><button class="btn btn-danger" data-remove-provider="'+i+'">删除</button></div></div><div class="form-grid"><div class="field"><label>ID</label><input data-provider-field="id" value="'+escapeHTML(p.id||'')+'"></div><div class="field"><label>名称</label><input data-provider-field="name" value="'+escapeHTML(p.name||'')+'"></div><div class="field"><label>分类</label><input data-provider-field="category" value="'+escapeHTML(p.category||'默认')+'"></div><div class="field"><label>本地订阅文件</label><input data-provider-field="subscriptionFile" value="'+escapeHTML(p.subscriptionFile||'')+'"></div><div class="field" style="grid-column:1/-1"><label>订阅链接</label><input data-provider-field="subscriptionUrl" value="'+escapeHTML(p.subscriptionUrl||'')+'"></div></div></div>').join(''):'<div class="empty">还没有机场订阅。</div>';
+      document.querySelectorAll('[data-edit-sub]').forEach(btn=>btn.addEventListener('click',()=>openSubscriptionEditor(Number(btn.dataset.editSub))));
+      document.querySelectorAll('[data-remove-provider]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();const removed=adminConfig.providers.splice(Number(btn.dataset.removeProvider),1)[0];if(removed&&removed.id===activeSubProviderId)closeSubscriptionEditor();renderProviders(adminConfig.providers,statuses)}));
+      document.querySelectorAll('[data-provider-field]').forEach(el=>el.addEventListener('input',markSettingsDirty));
+    }
+    function renderAgentEditor(agents){
+      $('agentEditor').innerHTML=agents.length?agents.map((a,i)=>'<div class="editor-card" data-agent-index="'+i+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(a.name||a.id)+'</div><div class="editor-sub">'+escapeHTML(a.id||'')+' · '+escapeHTML(a.probeSource||'-')+'</div></div><button class="btn btn-danger" data-remove-agent="'+i+'">删除</button></div><div class="form-grid"><div class="field"><label>Agent ID</label><input data-agent-field="id" value="'+escapeHTML(a.id||'')+'"></div><div class="field"><label>显示名</label><input data-agent-field="name" value="'+escapeHTML(a.name||'')+'"></div><div class="field"><label>地区 / 探测源</label><input data-agent-field="probeSource" value="'+escapeHTML(a.probeSource||'')+'"></div><div class="field"><label>运营商</label><select data-agent-field="carrier">'+carrierOptions(a.carrier||'unknown')+'</select></div></div></div>').join(''):'<div class="empty">还没有配置 Agent。</div>';
+      document.querySelectorAll('[data-remove-agent]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();adminConfig.agents.splice(Number(btn.dataset.removeAgent),1);renderAgentEditor(adminConfig.agents)}));
+      document.querySelectorAll('[data-agent-field]').forEach(el=>el.addEventListener('input',()=>{markSettingsDirty();loadInstallCommand().catch(console.error)}));
+    }
+    function renderSettings(cfg){$('probeInterval').value=cfg.probe?.intervalSeconds||300;$('probeTimeout').value=cfg.probe?.timeoutSeconds||5;$('probeAttempts').value=cfg.probe?.attempts||3;$('probeConcurrency').value=cfg.probe?.maxConcurrency||32;$('probeTLS').value=cfg.probe?.tlsMode||'auto';$('agentTTL').value=cfg.agentReportTtl||900;$('tokenHint').textContent=cfg.agentTokenSet?'当前已配置 Token，留空保存则保持不变。':'当前未配置 Token。'}
+    function collectProviders(){return Array.from(document.querySelectorAll('[data-provider-index]')).map(card=>{const get=f=>card.querySelector('[data-provider-field="'+f+'"]').value.trim();return{id:get('id'),name:get('name'),category:get('category')||'默认',subscriptionUrl:get('subscriptionUrl'),subscriptionFile:get('subscriptionFile')}})}
+    function collectAgents(){return Array.from(document.querySelectorAll('[data-agent-index]')).map(card=>{const get=f=>card.querySelector('[data-agent-field="'+f+'"]');return{id:get('id').value.trim(),name:get('name').value.trim(),probeSource:get('probeSource').value.trim(),carrier:get('carrier').value}})}
+    function collectProbe(){return{intervalSeconds:Number($('probeInterval').value)||300,timeoutSeconds:Number($('probeTimeout').value)||5,attempts:Number($('probeAttempts').value)||1,maxConcurrency:Number($('probeConcurrency').value)||16,tlsMode:$('probeTLS').value||'auto'}}
+    async function saveConfig(partial){
+      const payload={agentReportTtl:Number($('agentTTL').value)||adminConfig.agentReportTtl||900,agents:partial.agents||collectAgents(),providers:partial.providers||collectProviders(),probe:partial.probe||collectProbe()};
+      const token=$('agentToken').value.trim();if(token)payload.agentToken=token;
+      const res=await apiJSON('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(res.error)throw new Error(res.error);settingsDirty=false;if(res.refreshError)toast('配置已保存，订阅刷新失败：'+res.refreshError,true);else toast('配置已保存');$('agentToken').value='';await load();if(settingsOpen())loadInstallCommand().catch(console.error);
+    }
+    function providerByActiveId(){return (adminConfig.providers||[]).find(p=>p.id===activeSubProviderId)}
+    function closeSubscriptionEditor(){activeSubProviderId='';$('subscriptionWorkbench').style.display='none';$('subscriptionContent').value=''}
+    async function openSubscriptionEditor(index){
+      const provider=collectProviders()[index];
+      if(!provider||!provider.id){toast('请先填写机场 ID',true);return}
+      activeSubProviderId=provider.id;
+      if(settingsDirty)await ensureProviderConfigSaved();
+      $('subscriptionWorkbench').style.display='block';
+      $('subEditorTitle').textContent='订阅内容 · '+(provider.name||provider.id);
+      $('subscriptionContent').value='';
+      await loadProviderSubscription(false);
+    }
+    async function ensureProviderConfigSaved(){
+      if(settingsDirty){
+        await saveConfig({providers:collectProviders()});
+      }
+    }
+    async function loadProviderSubscription(remote){
+      const provider=providerByActiveId();
+      if(!provider){toast('请选择机场',true);return}
+      if(remote)await ensureProviderConfigSaved();
+      const q=new URLSearchParams({id:activeSubProviderId});
+      if(remote)q.set('remote','1');
+      const data=await apiJSON('/api/admin/provider-subscription?'+q.toString(),{cache:'no-store'});
+      $('subscriptionContent').value=data.content||'';
+      const source=(remote?'远程抓取':'当前有效')+' · '+(data.source||'-')+' · 节点 '+Number(data.nodeCount||0);
+      $('subEditorHint').textContent=data.parseError?source+' · 解析失败：'+data.parseError:source;
+      toast(remote?'远程订阅已抓取':'订阅内容已读取',Boolean(data.parseError));
+    }
+    async function saveProviderSubscriptionContent(){
+      const provider=providerByActiveId();
+      if(!provider){toast('请选择机场',true);return}
+      const data=await apiJSON('/api/admin/provider-subscription',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:activeSubProviderId,content:$('subscriptionContent').value})});
+      settingsDirty=false;
+      if(data.config){adminConfig=data.config;renderProviders(adminConfig.providers||[],[])}
+      $('subEditorHint').textContent='已保存为本地覆盖 · 节点 '+Number(data.nodeCount||0)+(data.parseError?' · 解析失败：'+data.parseError:'');
+      if(data.refreshError)toast('内容已保存，刷新失败：'+data.refreshError,true);else toast('订阅内容已保存');
+      await load();
+    }
+    async function clearProviderSubscriptionOverride(){
+      if(!activeSubProviderId){toast('请选择机场',true);return}
+      const q=new URLSearchParams({id:activeSubProviderId});
+      const data=await apiJSON('/api/admin/provider-subscription?'+q.toString(),{method:'DELETE'});
+      settingsDirty=false;
+      if(data.config){adminConfig=data.config;renderProviders(adminConfig.providers||[],[])}
+      $('subscriptionContent').value='';
+      $('subEditorHint').textContent='已清除本地覆盖，当前机场将使用订阅链接。';
+      if(data.refreshError)toast('覆盖已清除，刷新失败：'+data.refreshError,true);else toast('本地覆盖已清除');
+      await load();
+    }
+    async function loadInstallCommand(){
+      const first=collectAgents()[0]||{id:'agent-$(hostname)',name:'新 Agent',probeSource:'城市运营商',carrier:'unknown'};
+      const q=new URLSearchParams({id:first.id||'agent-$(hostname)',name:first.name||first.id||'Agent',probe_source:first.probeSource||first.name||'Agent',carrier:first.carrier||'unknown'});
+      const res=await fetch('/api/admin/install-command?'+q.toString(),{cache:'no-store'}).then(r=>r.json());
+      $('installCommand').value=res.command||'';
+      $('installHint').textContent=res.tokenSet?'脚本会优先从当前主控下载 agent 二进制，失败后回落到 GitHub Release。':'主控还没有配置 Token，请先保存 Token 后再复制命令。';
+    }
+    document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchSettingsTab(btn.dataset.tab)));
+    $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('settingsModal').classList.contains('open'))closeSettings()});
+    $('reloadBtn').addEventListener('click',()=>load().catch(e=>toast(e.message,true)));
+    $('refreshBtn').addEventListener('click',async()=>{$('refreshBtn').disabled=true;try{const r=await fetch('/api/providers/refresh',{method:'POST'}).then(r=>r.json());if(r.error)toast(r.error,true);else toast('订阅已刷新');await load()}finally{$('refreshBtn').disabled=false}});
+    $('addProviderBtn').addEventListener('click',()=>{markSettingsDirty();adminConfig.providers.push({id:'new-provider',name:'新机场',category:'默认',subscriptionUrl:'',subscriptionFile:''});renderProviders(adminConfig.providers,[])});
+    $('addAgentBtn').addEventListener('click',()=>{markSettingsDirty();const n=adminConfig.agents.length+1;adminConfig.agents.push({id:'agent-'+n,name:'新 Agent '+n,probeSource:'城市运营商',carrier:'unknown'});renderAgentEditor(adminConfig.agents);loadInstallCommand().catch(console.error)});
+    $('copyInstallBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('installCommand').value);toast('安装命令已复制')}catch(e){$('installCommand').select();toast('已选中命令，可手动复制')}});
+    $('loadSubBtn').addEventListener('click',()=>loadProviderSubscription(false).catch(e=>toast(e.message,true)));
+    $('fetchRemoteSubBtn').addEventListener('click',()=>loadProviderSubscription(true).catch(e=>toast(e.message,true)));
+    $('saveSubContentBtn').addEventListener('click',()=>saveProviderSubscriptionContent().catch(e=>toast(e.message,true)));
+    $('clearSubOverrideBtn').addEventListener('click',()=>clearProviderSubscriptionOverride().catch(e=>toast(e.message,true)));
+    ['agentToken','agentTTL','probeInterval','probeTimeout','probeAttempts','probeConcurrency','probeTLS'].forEach(id=>$(id).addEventListener('input',markSettingsDirty));
+    $('modalSave').addEventListener('click',()=>{const partial=activeTab==='providers'?{providers:collectProviders()}:activeTab==='agents'?{agents:collectAgents()}:{probe:collectProbe()};saveConfig(partial).catch(e=>toast(e.message,true))});
+    load().catch(e=>toast(e.message,true));setInterval(()=>load().catch(console.error),5000);
+  </script>
+</body>
+</html>

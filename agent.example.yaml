@@ -1,0 +1,16 @@
+node_role: agent
+
+agent:
+  id: "ct-ningbo-01"
+  name: "宁波电信 01"
+  controller_url: "http://127.0.0.1:19200"
+  token: "change-this-long-random-token"
+  probe_source: "宁波电信"
+  carrier: "telecom"
+  report_interval_seconds: 300
+
+probe:
+  timeout_seconds: 5
+  attempts: 3
+  max_concurrency: 32
+  tls_mode: auto

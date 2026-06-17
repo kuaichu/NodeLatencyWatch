@@ -1,0 +1,15 @@
+proxies:
+  - name: "HK Demo 01"
+    type: trojan
+    server: example.com
+    port: 443
+    sni: example.com
+  - name: "SG Demo TCP"
+    type: ss
+    server: 1.1.1.1
+    port: 443
+  - name: "JP Demo TLS"
+    type: vless
+    server: cloudflare.com
+    port: 443
+    servername: cloudflare.com

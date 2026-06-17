@@ -1,0 +1,35 @@
+node_role: controller
+web_port: 19200
+state_dir: data
+
+agent:
+  token: "change-this-long-random-token"
+  report_ttl_seconds: 900
+
+agents:
+  - id: "ct-ningbo-01"
+    name: "宁波电信 01"
+    probe_source: "宁波电信"
+    carrier: "telecom"
+  - id: "cu-ningbo-01"
+    name: "宁波联通 01"
+    probe_source: "宁波联通"
+    carrier: "unicom"
+  - id: "cm-ningbo-01"
+    name: "宁波移动 01"
+    probe_source: "宁波移动"
+    carrier: "mobile"
+
+providers:
+  - id: "demo"
+    name: "示例机场"
+    category: "测试"
+    subscription_url: ""
+    subscription_file: "examples/demo-clash.yaml"
+
+probe:
+  interval_seconds: 300
+  timeout_seconds: 5
+  attempts: 3
+  max_concurrency: 32
+  tls_mode: auto
