@@ -174,7 +174,7 @@
       td.node-cell{min-width:0}.node-title{align-items:flex-start;gap:8px}.node{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}.meta{overflow-wrap:anywhere;font-size:11px}.node-curve{height:28px;padding:0 11px}
       td.info-cell{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.035);color:#d7e5ec}td.info-cell:before{content:attr(data-label);color:#728692;font-size:11px;font-weight:800}
       td.metric-col{display:block;margin-top:2px}td.metric-col:before{content:attr(data-label);display:block;margin:0 0 6px;color:#8fa4b2;font-size:11px;font-weight:850}.metric-cell{min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.metric-kv{min-width:0;padding:6px 7px}.metric-kv span{font-size:10px}.metric-kv strong{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-      .curve-card{width:calc(100vw - 16px)}.curve-head{gap:10px}.curve-toolbar{gap:8px}.curve-chip{flex:1;justify-content:center}.curve-select{width:100%}.curve-summary{gap:8px}.curve-chart{height:260px}.toast{right:8px;left:8px;bottom:10px;text-align:center}
+      .curve-card{width:calc(100vw - 16px)}.curve-head{gap:10px}.curve-toolbar{gap:8px}.curve-chip{flex:1;justify-content:center}.curve-select{width:100%}.curve-summary{gap:8px}.curve-chart{height:300px}.toast{right:8px;left:8px;bottom:10px;text-align:center}
     }
     @media(max-width:430px){
       .matrix-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.tool-field.wide,.tool-btn.sort-dir{grid-column:1/-1}.matrix-tools .tool-btn.primary{grid-column:1/2}.metric-cell{grid-template-columns:repeat(2,minmax(0,1fr))}.modal{padding:8px}.modal-card{width:calc(100vw - 16px);max-height:calc(100vh - 16px);padding:14px;border-radius:16px}.modal-head,.curve-head{align-items:stretch;flex-direction:column}.settings-card{padding:12px}.inline-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
@@ -621,15 +621,17 @@
       ].map(([k,v])=>'<div class="curve-stat"><span>'+k+'</span><strong>'+escapeHTML(v)+'</strong></div>').join('');
     }
     function renderCurveChart(samples,carrierEntries){
-      const metric=curveMetricInfo(), width=920, height=320, left=54, right=24, top=22, bottom=42;
+      const metric=curveMetricInfo(), chartEl=$('curveChart'), chartWidth=Math.round(chartEl.clientWidth||920), compact=chartWidth<560;
+      const width=compact?Math.max(320,chartWidth):920, height=compact?300:320, left=compact?64:54, right=compact?14:24, top=compact?22:22, bottom=compact?54:42;
+      const axisFont=compact?13:11, timeFont=compact?12:11, pointRadius=compact?3.8:3.2, singlePointRadius=compact?5:4.5, timeoutWidth=compact?4.4:3.6, timeoutHeight=compact?13:10;
       if(!samples.length){$('curveChart').innerHTML='<div class="curve-empty">这个节点在当前时间范围内还没有采样。</div>';$('curveLegend').innerHTML='';return}
       const now=Date.now(), start=now-curveState.hours*3600*1000, end=now, span=Math.max(end-start,1);
       const groups=new Map();
       samples.forEach(sample=>{const key=sampleCarrierKey(sample);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(sample)});
       const values=samples.map(curveValue).filter(value=>value!==null&&Number.isFinite(value));
       if(!values.length){
-        const timeoutMarks=samples.filter(sample=>!sample.success).slice(-180).map(sample=>{const x=left+((new Date(sample.time).getTime()-start)/span)*(width-left-right);return'<rect class="curve-timeout" x="'+(x-1.8).toFixed(1)+'" y="'+(height-bottom+8)+'" width="3.6" height="10" rx="1"></rect>'}).join('');
-        $('curveChart').innerHTML='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="超时分布"><line class="curve-axis" x1="'+left+'" y1="'+(height-bottom+13)+'" x2="'+(width-right)+'" y2="'+(height-bottom+13)+'"></line>'+timeoutMarks+'<text x="'+(left+12)+'" y="'+(top+20)+'" fill="#8ca0ad" font-size="13">当前指标没有可用曲线点，可能全部超时。</text></svg>';
+        const timeoutMarks=samples.filter(sample=>!sample.success).slice(-180).map(sample=>{const x=left+((new Date(sample.time).getTime()-start)/span)*(width-left-right);return'<rect class="curve-timeout" x="'+(x-timeoutWidth/2).toFixed(1)+'" y="'+(height-bottom+8)+'" width="'+timeoutWidth+'" height="'+timeoutHeight+'" rx="1.4"></rect>'}).join('');
+        $('curveChart').innerHTML='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="超时分布"><line class="curve-axis" x1="'+left+'" y1="'+(height-bottom+13)+'" x2="'+(width-right)+'" y2="'+(height-bottom+13)+'"></line>'+timeoutMarks+'<text x="'+(left+8)+'" y="'+(top+22)+'" fill="#8ca0ad" font-size="'+(compact?14:13)+'">当前指标没有可用曲线点，可能全部超时。</text></svg>';
         renderCurveLegend(groups,carrierEntries);
         return;
       }
@@ -640,17 +642,17 @@
       const yOf=value=>top+(1-(value/maxY))*(height-top-bottom);
       const yTicks=[0,.25,.5,.75,1].map(r=>maxY*r);
       let svg='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+escapeHTML(metric.label)+' 延迟曲线">';
-      yTicks.forEach(value=>{const y=yOf(value);svg+='<line class="curve-axis" x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(width-right)+'" y2="'+y.toFixed(1)+'"></line><text x="8" y="'+(y+4).toFixed(1)+'" fill="#718592" font-size="11" font-family="monospace">'+escapeHTML(fmtMetric(value))+'</text>'});
-      svg+='<text x="'+left+'" y="'+(height-12)+'" fill="#718592" font-size="11" font-family="monospace">'+escapeHTML(new Date(start).toLocaleTimeString())+'</text><text x="'+(width-right-70)+'" y="'+(height-12)+'" fill="#718592" font-size="11" font-family="monospace">'+escapeHTML(new Date(end).toLocaleTimeString())+'</text>';
+      yTicks.forEach(value=>{const y=yOf(value);svg+='<line class="curve-axis" x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(width-right)+'" y2="'+y.toFixed(1)+'"></line><text x="'+(compact?7:8)+'" y="'+(y+axisFont*.36).toFixed(1)+'" fill="#90a6b3" font-size="'+axisFont+'" font-family="monospace" font-weight="750">'+escapeHTML(fmtMetric(value))+'</text>'});
+      svg+='<text x="'+left+'" y="'+(height-16)+'" fill="#90a6b3" font-size="'+timeFont+'" font-family="monospace" font-weight="750">'+escapeHTML(new Date(start).toLocaleTimeString())+'</text><text text-anchor="end" x="'+(width-right)+'" y="'+(height-16)+'" fill="#90a6b3" font-size="'+timeFont+'" font-family="monospace" font-weight="750">'+escapeHTML(new Date(end).toLocaleTimeString())+'</text>';
       let colorIndex=0;
       for(const [key,list] of groups.entries()){
         const color=curvePalette[colorIndex++%curvePalette.length];
         const points=list.map(sample=>({sample,value:curveValue(sample)})).filter(p=>p.value!==null&&Number.isFinite(p.value)).map(p=>[xOf(p.sample.time),yOf(p.value),p.value]);
         if(points.length>1)svg+='<polyline class="curve-line" stroke="'+color+'" points="'+points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"></polyline>';
-        points.slice(-80).forEach(p=>{svg+='<circle class="curve-point" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.2" fill="'+color+'"></circle>'});
-        if(points.length===1)svg+='<circle class="curve-point" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="4.5" fill="'+color+'"></circle>';
+        points.slice(-80).forEach(p=>{svg+='<circle class="curve-point" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+pointRadius+'" fill="'+color+'"></circle>'});
+        if(points.length===1)svg+='<circle class="curve-point" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="'+singlePointRadius+'" fill="'+color+'"></circle>';
       }
-      samples.filter(sample=>!sample.success).slice(-180).forEach(sample=>{const x=xOf(sample.time);svg+='<rect class="curve-timeout" x="'+(x-1.8).toFixed(1)+'" y="'+(height-bottom+8)+'" width="3.6" height="10" rx="1"></rect>'});
+      samples.filter(sample=>!sample.success).slice(-180).forEach(sample=>{const x=xOf(sample.time);svg+='<rect class="curve-timeout" x="'+(x-timeoutWidth/2).toFixed(1)+'" y="'+(height-bottom+8)+'" width="'+timeoutWidth+'" height="'+timeoutHeight+'" rx="1.4"></rect>'});
       svg+='</svg>';
       $('curveChart').innerHTML=svg;
       renderCurveLegend(groups,carrierEntries);
