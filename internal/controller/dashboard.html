@@ -321,11 +321,11 @@
     function msCell(sample){
       if(!sample)return'<span class="latency bad">无数据</span>';
       const rtt=Number(sample.tcpMs||0), max=Number(sample.maxRttMs||rtt||0), std=Number(sample.rttStdDevMs||0), http=Number(sample.httpMs||0), loss=Number(sample.lossRate||0);
-      if(!sample.success)return'<div class="metric-cell">'+metricKV('状态','失败','bad')+metricKV('丢包',loss.toFixed(0)+'%','bad')+metricKV('RTT',fmtMs(rtt),msClass(rtt))+metricKV('HTTP',fmtMs(http),'bad')+'</div>';
+      if(!sample.success)return'<div class="metric-cell">'+metricKV('状态','失败','bad')+metricKV('丢包',loss.toFixed(0)+'%','bad')+metricKV('RTT','超时','bad')+metricKV('HTTP','超时','bad')+'</div>';
       return'<div class="metric-cell">'+
         metricKV('RTT',fmtMs(rtt),msClass(rtt))+
         metricKV('MAX',fmtMs(max),msClass(max))+
-        metricKV('σ',std.toFixed(1),std>80?'bad':std>25?'warn':'ok')+
+        metricKV('抖动',std.toFixed(1),std>80?'bad':std>25?'warn':'ok')+
         metricKV('HTTP',fmtMs(http),msClass(http))+
         metricKV('丢包',loss.toFixed(0)+'%',loss>50?'bad':loss>0?'warn':'ok')+
         metricKV('模式',sample.probeMode==='http-204'?'204':'入口','neutral')+
