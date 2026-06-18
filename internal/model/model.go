@@ -2,6 +2,11 @@ package model
 
 import "time"
 
+const (
+	ProbeModeEntry    = "entry"
+	ProbeModeProxy204 = "proxy-204"
+)
+
 type Provider struct {
 	ID               string `json:"id" yaml:"id"`
 	Name             string `json:"name" yaml:"name"`

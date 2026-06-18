@@ -22,6 +22,11 @@ type attemptResult struct {
 	err        error
 }
 
+var (
+	probeProxyTCP     = probeProxyTCPOnce
+	probeProxyHTTP204 = probeHTTP204Once
+)
+
 func Run(nodes []model.ProxyNode, cfg model.ProbeConfig) []model.NodeResult {
 	if cfg.Attempts <= 0 {
 		cfg.Attempts = 1
@@ -65,7 +70,7 @@ func probeEntryNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResul
 	result := model.NodeResult{
 		NodeID:    node.ID,
 		Attempts:  cfg.Attempts,
-		ProbeMode: "entry",
+		ProbeMode: model.ProbeModeEntry,
 	}
 	var successes int
 	var dnsValues, tcpValues, tlsValues []float64
@@ -108,24 +113,19 @@ func probeProxyNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResul
 	result := model.NodeResult{
 		NodeID:    node.ID,
 		Attempts:  cfg.Attempts,
-		ProbeMode: "http-204",
+		ProbeMode: model.ProbeModeProxy204,
 	}
 	var successes int
-	var dnsValues, tcpValues, httpValues []float64
-	var resolvedIP string
+	var tcpValues, httpValues []float64
 	var lastErr error
 	for i := 0; i < cfg.Attempts; i++ {
-		entry := probeEntryOnce(node, cfg)
-		if entry.err == nil {
-			dnsValues = append(dnsValues, entry.dnsMs)
-			tcpValues = append(tcpValues, entry.tcpMs)
-			if resolvedIP == "" {
-				resolvedIP = entry.resolvedIP
-			}
+		tcpMs, err := probeProxyTCP(node, cfg)
+		if err == nil {
+			tcpValues = append(tcpValues, tcpMs)
 		} else {
-			lastErr = entry.err
+			lastErr = err
 		}
-		httpMs, err := probeHTTP204Once(node, cfg)
+		httpMs, err := probeProxyHTTP204(node, cfg)
 		if err != nil {
 			lastErr = err
 			continue
@@ -138,12 +138,10 @@ func probeProxyNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResul
 		result.LossRate = float64(cfg.Attempts-successes) / float64(cfg.Attempts) * 100
 	}
 	result.Success = successes > 0
-	result.DNSMs = average(dnsValues)
 	result.TCPMs = average(tcpValues)
 	result.MaxRTTMs = max(tcpValues)
 	result.RTTStdDevMs = stddev(tcpValues)
 	result.HTTPMs = average(httpValues)
-	result.ResolvedIP = resolvedIP
 	if !result.Success && lastErr != nil {
 		result.Error = lastErr.Error()
 	}

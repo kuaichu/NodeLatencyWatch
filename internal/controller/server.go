@@ -394,6 +394,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	s.nodesMu.RLock()
 	nodes := append([]model.ProxyNode(nil), s.nodes...)
 	s.nodesMu.RUnlock()
+	nodesIndex := indexNodesByID(nodes)
 	samples, err := s.store.LatestSamples(5000)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})
@@ -403,6 +404,10 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	latestByNodeCarrier := make(map[string]map[string]model.NodeSample)
 	stats := make(map[string][]model.NodeSample)
 	for _, sample := range samples {
+		node, ok := nodesIndex[sample.NodeID]
+		if !ok || !sampleMatchesCurrentProbeMode(sample, node) {
+			continue
+		}
 		stats[sample.NodeID] = append(stats[sample.NodeID], sample)
 		if latestByNodeCarrier[sample.NodeID] == nil {
 			latestByNodeCarrier[sample.NodeID] = map[string]model.NodeSample{}
@@ -476,6 +481,7 @@ func (s *Server) handleSamples(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		samples = filterSamplesForAgents(samples, agentCarriers)
+		samples = s.filterSamplesByCurrentProbeMode(samples)
 		if carrierFilter != "unknown" {
 			samples = filterSamplesByCarrier(samples, carrierFilter)
 		}
@@ -488,6 +494,9 @@ func (s *Server) handleSamples(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	samples = filterSamplesForAgents(samples, agentCarriers)
+	if node, ok := s.currentNodeByID(nodeID); ok {
+		samples = filterSamplesByProbeMode(samples, node)
+	}
 	if carrierFilter != "unknown" {
 		samples = filterSamplesByCarrier(samples, carrierFilter)
 	}
@@ -1018,6 +1027,71 @@ func filterSamplesByCarrier(samples []model.NodeSample, carrier string) []model.
 		}
 	}
 	return out
+}
+
+func (s *Server) currentNodeByID(nodeID string) (model.ProxyNode, bool) {
+	s.nodesMu.RLock()
+	defer s.nodesMu.RUnlock()
+	node, ok := s.nodesByID[nodeID]
+	return node, ok
+}
+
+func (s *Server) filterSamplesByCurrentProbeMode(samples []model.NodeSample) []model.NodeSample {
+	if len(samples) == 0 {
+		return nil
+	}
+	s.nodesMu.RLock()
+	nodes := make(map[string]model.ProxyNode, len(s.nodesByID))
+	for id, node := range s.nodesByID {
+		nodes[id] = node
+	}
+	s.nodesMu.RUnlock()
+	out := samples[:0]
+	for _, sample := range samples {
+		node, ok := nodes[sample.NodeID]
+		if ok && sampleMatchesCurrentProbeMode(sample, node) {
+			out = append(out, sample)
+		}
+	}
+	return out
+}
+
+func indexNodesByID(nodes []model.ProxyNode) map[string]model.ProxyNode {
+	out := make(map[string]model.ProxyNode, len(nodes))
+	for _, node := range nodes {
+		out[node.ID] = node
+	}
+	return out
+}
+
+func filterSamplesByProbeMode(samples []model.NodeSample, node model.ProxyNode) []model.NodeSample {
+	if len(samples) == 0 {
+		return nil
+	}
+	out := samples[:0]
+	for _, sample := range samples {
+		if sampleMatchesCurrentProbeMode(sample, node) {
+			out = append(out, sample)
+		}
+	}
+	return out
+}
+
+func sampleMatchesCurrentProbeMode(sample model.NodeSample, node model.ProxyNode) bool {
+	expected := currentProbeModeForNode(node)
+	if expected == model.ProbeModeEntry {
+		return sample.ProbeMode == "" || sample.ProbeMode == model.ProbeModeEntry
+	}
+	return sample.ProbeMode == expected
+}
+
+func currentProbeModeForNode(node model.ProxyNode) string {
+	if len(node.Outbound) > 0 {
+		if _, ok := node.Outbound["type"].(string); ok {
+			return model.ProbeModeProxy204
+		}
+	}
+	return model.ProbeModeEntry
 }
 
 func publicNodes(nodes []model.ProxyNode) []model.ProxyNode {

@@ -422,6 +422,7 @@
     function msClass(ms){return ms>800?'bad':ms>300?'warn':'ok'}
     function fmtMs(ms){return ms?Number(ms).toFixed(0)+'ms':'0ms'}
     function metricKV(k,v,cls){return'<div class="metric-kv '+(cls||'')+'"><span>'+k+'</span><strong>'+escapeHTML(v)+'</strong></div>'}
+    function probeModeLabel(mode){if(mode==='proxy-204')return'出口 204';if(mode==='http-204')return'旧 204';if(mode==='entry')return'入口';return mode||'-'}
     function msCell(sample){
       if(!sample)return'<span class="latency bad">无数据</span>';
       const rtt=Number(sample.tcpMs||0), max=Number(sample.maxRttMs||rtt||0), std=Number(sample.rttStdDevMs||0), http=Number(sample.httpMs||0), loss=Number(sample.lossRate||0);
@@ -432,7 +433,7 @@
         metricKV('抖动',std.toFixed(1),std>80?'bad':std>25?'warn':'ok')+
         metricKV('HTTP',fmtMs(http),msClass(http))+
         metricKV('丢包',loss.toFixed(0)+'%',loss>50?'bad':loss>0?'warn':'ok')+
-        metricKV('模式',sample.probeMode==='http-204'?'204':'入口','neutral')+
+        metricKV('模式',probeModeLabel(sample.probeMode),'neutral')+
       '</div>'
     }
     function carrierOptions(selected){return carriers.map(([v,l])=>'<option value="'+v+'" '+(v===selected?'selected':'')+'>'+l+'</option>').join('')}
