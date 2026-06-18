@@ -348,6 +348,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	setNoStore(w)
 	_, _ = w.Write(data)
 }
 
@@ -887,7 +888,14 @@ func (s *Server) agentAuthorized(r *http.Request) bool {
 
 func writeJSON(w http.ResponseWriter, value any) {
 	w.Header().Set("Content-Type", "application/json")
+	setNoStore(w)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+func setNoStore(w http.ResponseWriter) {
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 }
 
 func firstNonEmpty(values ...string) string {
