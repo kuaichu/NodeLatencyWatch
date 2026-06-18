@@ -92,6 +92,12 @@
     .country-count{margin-left:6px;color:#6f8593;font-family:var(--mono);font-size:11px}.country-chip.active .country-count{color:#b8dcf5}
     .country-chip:hover{transform:translateY(-1px);color:#d7e5ec;border-color:rgba(132,162,184,.3)}
     .country-chip.active{border-color:rgba(105,183,255,.42);background:rgba(105,183,255,.12);color:#e7f5ff}
+    .matrix-tools{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.03)}
+    .tool-field{display:grid;gap:5px;min-width:118px}.tool-field.compact{min-width:86px}.tool-field.wide{min-width:142px}
+    .tool-field label{color:#6f8391;font-size:11px;font-weight:780}.tool-field select,.tool-field input{height:34px;border:1px solid rgba(132,162,184,.16);border-radius:10px;background:#071018;color:#dceaf0;padding:0 10px;font:12px var(--mono)}
+    .tool-field input::placeholder{color:#526672}.tool-field select:focus,.tool-field input:focus{outline:none;border-color:rgba(105,183,255,.45);box-shadow:0 0 0 3px rgba(105,183,255,.1)}
+    .tool-btn{height:34px;padding:0 12px;border:1px solid rgba(132,162,184,.18);border-radius:10px;background:rgba(255,255,255,.045);font-size:12px;font-weight:850;cursor:pointer}
+    .tool-btn.primary{border-color:rgba(32,214,162,.32);background:rgba(32,214,162,.12);color:#dffcf2}.tool-btn:hover{border-color:rgba(132,162,184,.34)}
     .table-wrap{overflow:auto;border:1px solid rgba(132,162,184,.14);border-radius:18px;background:rgba(255,255,255,.035)}
     table{width:100%;border-collapse:collapse;table-layout:fixed}
     th,td{padding:12px 13px;border-bottom:1px solid rgba(132,162,184,.12);text-align:left;vertical-align:middle;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -133,6 +139,7 @@
     .toast.show{opacity:1;transform:translateY(0)}
     @media(max-width:980px){
       .shell{width:min(100vw - 24px,1220px);padding-top:18px}.topbar,.hero{grid-template-columns:1fr;display:grid}.agent-grid{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.settings-layout{grid-template-columns:1fr}.form-grid,.form-grid.compact{grid-template-columns:1fr}.modal{padding:12px}.modal-card{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}
+      .matrix-tools{align-items:stretch}.tool-field,.tool-field.compact,.tool-field.wide{min-width:calc(50% - 5px);flex:1}.tool-btn{flex:1}
     }
   </style>
 </head>
@@ -194,6 +201,7 @@
         </div>
       </div>
       <div class="country-rail" id="countryRail"></div>
+      <div class="matrix-tools" id="matrixTools"></div>
       <div id="matrix"></div>
     </section>
   </div>
@@ -330,8 +338,17 @@
       {code:'ae',flag:'🇦🇪',label:'阿联酋',patterns:[/united\s*arab\s*emirates/i,/dubai/i,/阿联酋/i,/阿聯酋/i,/迪拜/i,/(^|[\s._-])uae\d*($|[\s._-])/i,/(^|[\s._-])ae\d*($|[\s._-])/i]}
     ];
     const unknownCountry={code:'unknown',flag:'▫',flagCode:'',short:'--',label:'未知'};
+    const sortMetrics=[
+      ['default','订阅顺序'],
+      ['rtt','RTT'],
+      ['http','HTTP'],
+      ['jitter','抖动'],
+      ['loss','丢包'],
+      ['max','MAX']
+    ];
     const $=id=>document.getElementById(id);
-    let adminConfig=null, activeTab='providers', selectedCategory='all', selectedCountry='all', lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
+    let adminConfig=null, activeTab='providers', selectedCategory='all', selectedCountry='all', matrixSort='default', matrixSortDir='asc', matrixMetricCarrier='best', lastStatus=null, lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
+    const matrixFilters={rtt:'',http:'',jitter:'',loss:''};
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
     async function apiJSON(url,options){
@@ -339,6 +356,18 @@
       const data=await res.json().catch(()=>({error:'HTTP '+res.status}));
       if(!res.ok||data.error)throw new Error(data.error||('HTTP '+res.status));
       return data;
+    }
+    function versionParts(value){
+      const parts=String(value||'').split(':'), timestamp=Number(parts[0]||0), count=Number(parts[1]||0);
+      return{time:timestamp>0?new Date(timestamp*1000):null,count:Number.isFinite(count)&&count>0?count:0}
+    }
+    function statusRefreshTime(status){
+      if(status&&status.lastRefresh)return new Date(status.lastRefresh);
+      return versionParts(status&&status.subscriptionVersion).time;
+    }
+    function subscriptionDetail(status){
+      const parts=versionParts(status&&status.subscriptionVersion), count=parts.count||Number(status&&status.nodeCount||0), time=statusRefreshTime(status);
+      return count+' 个节点 · '+(time?time.toLocaleString():'未刷新');
     }
     function lockBody(){document.body.dataset.scrollY=String(window.scrollY);document.body.classList.add('modal-open');document.body.style.top='-'+window.scrollY+'px'}
     function unlockBody(){const y=Number(document.body.dataset.scrollY||0);document.body.classList.remove('modal-open');document.body.style.top='';window.scrollTo(0,y)}
@@ -366,6 +395,57 @@
     function carrierOptions(selected){return carriers.map(([v,l])=>'<option value="'+v+'" '+(v===selected?'selected':'')+'>'+l+'</option>').join('')}
     function carrierLabel(value){const found=carriers.find(c=>c[0]===value);return found?found[1]:value}
     function carriersForAgents(agents){const present=new Set((agents||[]).map(a=>a.carrier||'unknown'));return carriers.filter(c=>present.has(c[0]))}
+    function sortMetricLabel(value){const found=sortMetrics.find(m=>m[0]===value);return found?found[1]:value}
+    function filterNumber(value){const text=String(value||'').trim();if(!text)return null;const n=Number(text);return Number.isFinite(n)&&n>=0?n:null}
+    function sampleValue(sample,key){
+      if(!sample)return Infinity;
+      const loss=Number(sample.lossRate||0);
+      if(!sample.success)return key==='loss'?loss||100:Infinity;
+      if(key==='rtt')return Number(sample.tcpMs||0);
+      if(key==='http')return Number(sample.httpMs||0);
+      if(key==='jitter')return Number(sample.rttStdDevMs||0);
+      if(key==='loss')return loss;
+      if(key==='max')return Number(sample.maxRttMs||sample.tcpMs||0);
+      return 0;
+    }
+    function sampleScore(sample){
+      if(!sample)return Infinity;
+      const failed=sample.success?0:1000000;
+      return failed+sampleValue(sample,'loss')*1000+sampleValue(sample,'rtt')*2+sampleValue(sample,'http')+sampleValue(sample,'jitter')*5;
+    }
+    function sampleForRow(row){
+      const list=Array.isArray(row&&row.latest)?row.latest:[];
+      if(matrixMetricCarrier!=='best')return list.find(s=>s.carrier===matrixMetricCarrier);
+      return list.slice().sort((a,b)=>sampleScore(a)-sampleScore(b))[0];
+    }
+    function activeMatrixFilters(){
+      return Object.entries(matrixFilters).filter(([,value])=>filterNumber(value)!==null).map(([key,value])=>sortMetricLabel(key)+'≤'+filterNumber(value)+(key==='loss'?'%':'ms'));
+    }
+    function rowPassesMatrixFilters(row){
+      const sample=sampleForRow(row);
+      return ['rtt','http','jitter','loss'].every(key=>{const limit=filterNumber(matrixFilters[key]);return limit===null||sampleValue(sample,key)<=limit})
+    }
+    function collectMatrixFilters(){
+      ['rtt','http','jitter','loss'].forEach(key=>{const el=$('matrixFilter_'+key);matrixFilters[key]=el?el.value.trim():matrixFilters[key]});
+    }
+    function renderMatrixTools(){
+      if(matrixMetricCarrier!=='best'&&!matrixCarriers.some(c=>c[0]===matrixMetricCarrier))matrixMetricCarrier='best';
+      const sortOptions=sortMetrics.map(([value,label])=>'<option value="'+value+'" '+(matrixSort===value?'selected':'')+'>'+label+'</option>').join('');
+      const carrierOptionsHTML='<option value="best" '+(matrixMetricCarrier==='best'?'selected':'')+'>最佳线路</option>'+matrixCarriers.map(c=>'<option value="'+escapeHTML(c[0])+'" '+(matrixMetricCarrier===c[0]?'selected':'')+'>'+escapeHTML(c[1])+'</option>').join('');
+      const input=(key,label,placeholder)=>'<div class="tool-field compact"><label>'+label+'上限</label><input id="matrixFilter_'+key+'" inputmode="decimal" value="'+escapeHTML(matrixFilters[key])+'" placeholder="'+placeholder+'"></div>';
+      $('matrixTools').innerHTML=
+        '<div class="tool-field wide"><label>排序指标</label><select id="matrixSortSelect">'+sortOptions+'</select></div>'+
+        '<div class="tool-field wide"><label>排序线路</label><select id="matrixCarrierSelect">'+carrierOptionsHTML+'</select></div>'+
+        '<button type="button" class="tool-btn" id="matrixSortDir">'+(matrixSortDir==='asc'?'低到高':'高到低')+'</button>'+
+        input('rtt','RTT','ms')+input('http','HTTP','ms')+input('jitter','抖动','ms')+input('loss','丢包','%')+
+        '<button type="button" class="tool-btn primary" id="matrixFilterApply">应用</button><button type="button" class="tool-btn" id="matrixFilterReset">清空</button>';
+      $('matrixSortSelect').addEventListener('change',e=>{collectMatrixFilters();matrixSort=e.target.value;renderMatrix(lastOverview)});
+      $('matrixCarrierSelect').addEventListener('change',e=>{collectMatrixFilters();matrixMetricCarrier=e.target.value;renderMatrix(lastOverview)});
+      $('matrixSortDir').addEventListener('click',()=>{collectMatrixFilters();matrixSortDir=matrixSortDir==='asc'?'desc':'asc';renderMatrix(lastOverview)});
+      $('matrixFilterApply').addEventListener('click',()=>{collectMatrixFilters();renderMatrix(lastOverview)});
+      $('matrixFilterReset').addEventListener('click',()=>{Object.keys(matrixFilters).forEach(key=>matrixFilters[key]='');renderMatrix(lastOverview)});
+      document.querySelectorAll('#matrixTools input').forEach(input=>input.addEventListener('keydown',e=>{if(e.key==='Enter'){collectMatrixFilters();renderMatrix(lastOverview)}}));
+    }
     function countryText(row){const n=row&&row.node?row.node:{};return [n.name,n.server,n.provider,n.category].filter(Boolean).join(' ').replace(/[_-]+/g,' ')}
     function countryForRow(row){const text=countryText(row);return countries.find(c=>c.patterns.some(pattern=>pattern.test(text)))||unknownCountry}
     function flagHTML(country){
@@ -399,6 +479,7 @@
       ]);
       const editingSettings=settingsOpen()||settingsDirty;
       if(!editingSettings||!adminConfig)adminConfig=cfg;
+      lastStatus=status;
       lastOverview=Array.isArray(overview)?overview:[];
       lastAgentStatuses=Array.isArray(allAgents)?allAgents:[];
       matrixCarriers=carriersForAgents(cfg.agents||[]);
@@ -411,12 +492,13 @@
     }
     function renderHero(status,cfg){
       const label=selectedCategory==='all'?'全部机场':selectedCategory;
+      const refreshed=statusRefreshTime(status);
       $('heroTitle').textContent=label;
-      $('heroSub').innerHTML=['机场 '+(status.providerCount||0),'节点 '+(status.nodeCount||0),'订阅版本 '+(status.subscriptionVersion||'-')].map(x=>'<span class="sub-chip">'+escapeHTML(x)+'</span>').join('');
+      $('heroSub').innerHTML=['机场 '+(status.providerCount||0),'节点 '+(status.nodeCount||0),'订阅刷新 '+(refreshed?refreshed.toLocaleTimeString():'未刷新')].map(x=>'<span class="sub-chip">'+escapeHTML(x)+'</span>').join('');
     }
     function renderStatus(status){
       $('statusPanel').innerHTML=[
-        ['订阅版本',status.subscriptionVersion||'-'],
+        ['订阅状态',subscriptionDetail(status)],
         ['最近刷新',status.lastRefresh?new Date(status.lastRefresh).toLocaleString():'-'],
         ['刷新错误',status.lastRefreshError||'无'],
         ['TLS 模式',status.probe?status.probe.tlsMode:'-']
@@ -424,7 +506,7 @@
     }
     function renderCategoryRail(cats){
       $('categoryRail').innerHTML='<button class="profile-chip '+(selectedCategory==='all'?'active':'')+'" data-category="all">全部机场</button>'+cats.map(cat=>'<button class="profile-chip '+(selectedCategory===cat?'active':'')+'" data-category="'+escapeHTML(cat)+'">'+escapeHTML(cat)+'</button>').join('');
-      document.querySelectorAll('[data-category]').forEach(btn=>btn.addEventListener('click',()=>{selectedCategory=btn.dataset.category;renderCategoryRail(cats);renderMatrix(lastOverview);renderHero({providerCount:adminConfig.providers.length,nodeCount:lastOverview.length,subscriptionVersion:adminConfig.subscriptionVersion},adminConfig)}));
+      document.querySelectorAll('[data-category]').forEach(btn=>btn.addEventListener('click',()=>{selectedCategory=btn.dataset.category;renderCategoryRail(cats);renderMatrix(lastOverview);renderHero(lastStatus||{providerCount:adminConfig.providers.length,nodeCount:lastOverview.length,subscriptionVersion:adminConfig.subscriptionVersion},adminConfig)}));
     }
     function renderAgentsGrid(list){
       if(!list.length){$('agentGrid').innerHTML='<div class="empty">Agent 首次上报后会在这里自动显示。预配置探针请到“管理设置 / Agent 探针”。</div>';return}
@@ -437,11 +519,25 @@
       const countryList=countriesForRows(categoryRows);
       if(selectedCountry!=='all'&&!countryList.some(country=>country.code===selectedCountry))selectedCountry='all';
       renderCountryRail(countryList,categoryRows.length);
-      const filtered=selectedCountry==='all'?categoryRows:categoryRows.filter(row=>countryForRow(row).code===selectedCountry);
+      renderMatrixTools();
+      const countryFiltered=selectedCountry==='all'?categoryRows:categoryRows.filter(row=>countryForRow(row).code===selectedCountry);
+      const filters=activeMatrixFilters();
+      const filteredItems=countryFiltered.map((row,index)=>({row,index})).filter(item=>rowPassesMatrixFilters(item.row));
+      if(matrixSort!=='default'){
+        const direction=matrixSortDir==='asc'?1:-1;
+        filteredItems.sort((a,b)=>{
+          const av=sampleValue(sampleForRow(a.row),matrixSort), bv=sampleValue(sampleForRow(b.row),matrixSort);
+          if(av===bv)return a.index-b.index;
+          return (av-bv)*direction;
+        });
+      }
+      const filtered=filteredItems.map(item=>item.row);
       const countryLabel=selectedCountry==='all'?'全部地区':(countryList.find(country=>country.code===selectedCountry)?.label||'未知');
-      const carrierHint=matrixCarriers.length?(' · '+matrixCarriers.map(c=>c[1]).join(' / ')):' · 未配置 Agent';
-      $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+countryLabel+' · '+filtered.length+' 个节点'+carrierHint;
-      if(!filtered.length){$('matrix').innerHTML='<div class="empty">当前分类没有节点。请在管理设置里检查机场订阅。</div>';return}
+      const carrierLabelText=matrixMetricCarrier==='best'?'最佳线路':(matrixCarriers.find(c=>c[0]===matrixMetricCarrier)?.[1]||carrierLabel(matrixMetricCarrier));
+      const sortLabel=matrixSort==='default'?'订阅顺序':sortMetricLabel(matrixSort)+' '+(matrixSortDir==='asc'?'低到高':'高到低');
+      const countLabel=filtered.length+(filters.length?' / '+countryFiltered.length:'')+' 个节点';
+      $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+countryLabel+' · '+countLabel+' · '+carrierLabelText+' · '+sortLabel+(filters.length?' · '+filters.join(' / '):'');
+      if(!filtered.length){$('matrix').innerHTML='<div class="empty">'+(countryFiltered.length?'当前指标筛选没有节点。请放宽 RTT / HTTP / 抖动 / 丢包上限。':'当前分类没有节点。请在管理设置里检查机场订阅。')+'</div>';return}
       const metricHead=matrixCarriers.map(c=>'<th>'+escapeHTML(c[1])+'</th>').join('');
       $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
     }
