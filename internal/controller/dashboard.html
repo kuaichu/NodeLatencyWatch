@@ -104,6 +104,7 @@
     th{color:var(--muted);font-size:12px;font-weight:760;background:rgba(4,12,18,.26)}
     tr:last-child td{border-bottom:0}tr:hover td{background:rgba(255,255,255,.025)}
     .node-title{display:flex;align-items:center;gap:8px;min-width:0}.flag{display:inline-grid;place-items:center;width:22px;height:16px;flex:0 0 22px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.14);color:#d7e5ec;font-family:var(--mono);font-size:9px;font-weight:900;line-height:1}.flag-img,.flag-code{grid-area:1/1}.flag-img{width:100%;height:100%;object-fit:cover}.country-chip .flag{width:20px;height:15px;flex-basis:20px}.node{font-weight:850;min-width:0;overflow:hidden;text-overflow:ellipsis}.meta{display:block;margin-top:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+    .node-curve{margin-left:auto;height:24px;padding:0 9px;border:1px solid rgba(105,183,255,.24);border-radius:999px;background:rgba(105,183,255,.09);color:#bde3ff;font-size:11px;font-weight:850;cursor:pointer;flex:0 0 auto}.node-curve:hover{border-color:rgba(105,183,255,.46);background:rgba(105,183,255,.14)}
     .latency,.badge{display:inline-flex;align-items:center;min-width:64px;height:24px;padding:0 8px;border-radius:999px;background:rgba(32,214,162,.12);color:#9ff5d1;font-family:var(--mono);font-size:12px}
     .latency.warn,.badge.warn{background:rgba(244,201,93,.13);color:#f4d98f}.latency.bad,.badge.bad{background:rgba(255,107,107,.13);color:#ffc7c7}.badge.neutral{background:rgba(255,255,255,.06);color:#b8c7d0}
     .metric-cell{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;min-width:158px;white-space:normal}
@@ -135,11 +136,22 @@
     .editor-card{border:1px solid rgba(132,162,184,.14);border-radius:16px;padding:14px;background:rgba(255,255,255,.035);margin-bottom:10px}
     .editor-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px}
     .editor-title{font-weight:850}.editor-sub{margin-top:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+    .curve-card{width:min(1040px,calc(100vw - 48px))}
+    .curve-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:14px}.curve-head h2{overflow-wrap:anywhere}
+    .curve-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+    .curve-chip{min-height:32px;padding:0 11px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.04);color:#9eb0bc;font-size:12px;font-weight:850;cursor:pointer}.curve-chip.active{border-color:rgba(32,214,162,.4);background:rgba(32,214,162,.12);color:#dffcf2}
+    .curve-select{height:34px;border:1px solid rgba(132,162,184,.16);border-radius:10px;background:#071018;color:#dceaf0;padding:0 10px;font:12px var(--mono)}
+    .curve-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}.curve-stat{border:1px solid rgba(132,162,184,.13);border-radius:12px;padding:10px;background:rgba(255,255,255,.035)}.curve-stat span{display:block;color:#718592;font-size:11px}.curve-stat strong{display:block;margin-top:5px;font-family:var(--mono);font-size:16px}
+    .curve-chart{position:relative;height:360px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));overflow:hidden}
+    .curve-chart svg{width:100%;height:100%;display:block}.curve-axis{stroke:rgba(132,162,184,.16);stroke-width:1}.curve-line{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.curve-point{stroke:#081018;stroke-width:1}.curve-timeout{fill:rgba(255,107,107,.78)}
+    .curve-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;color:#9aaeba;font-size:12px}.legend-item{display:inline-flex;align-items:center;gap:6px}.legend-dot{width:10px;height:10px;border-radius:50%}
+    .curve-empty{height:100%;display:grid;place-items:center;color:var(--muted);text-align:center;padding:24px}
     .toast{position:fixed;right:18px;bottom:18px;z-index:20;padding:12px 15px;border:1px solid rgba(32,214,162,.45);border-radius:12px;background:#0b1620;color:var(--text);box-shadow:0 18px 50px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:.18s ease;pointer-events:none}
     .toast.show{opacity:1;transform:translateY(0)}
     @media(max-width:980px){
       .shell{width:min(100vw - 24px,1220px);padding-top:18px}.topbar,.hero{grid-template-columns:1fr;display:grid}.agent-grid{grid-template-columns:1fr}.metric-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.settings-layout{grid-template-columns:1fr}.form-grid,.form-grid.compact{grid-template-columns:1fr}.modal{padding:12px}.modal-card{width:calc(100vw - 24px);max-height:calc(100vh - 24px)}
       .matrix-tools{align-items:stretch}.tool-field,.tool-field.compact,.tool-field.wide{min-width:calc(50% - 5px);flex:1}.tool-btn{flex:1}
+      .curve-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.curve-chart{height:300px}
     }
   </style>
 </head>
@@ -308,6 +320,34 @@
       </div>
     </div>
   </div>
+  <div class="modal" id="curveModal">
+    <div class="modal-card curve-card">
+      <div class="curve-head">
+        <div>
+          <h2 id="curveTitle">延迟曲线</h2>
+          <div class="small" id="curveSub">最近采样走势</div>
+        </div>
+        <button class="btn" id="curveClose">关闭</button>
+      </div>
+      <div class="curve-toolbar">
+        <button class="curve-chip active" data-curve-metric="rtt">RTT</button>
+        <button class="curve-chip" data-curve-metric="http">HTTP</button>
+        <button class="curve-chip" data-curve-metric="jitter">抖动</button>
+        <button class="curve-chip" data-curve-metric="loss">丢包</button>
+        <select class="curve-select" id="curveHours">
+          <option value="1">最近 1 小时</option>
+          <option value="6">最近 6 小时</option>
+          <option value="24" selected>最近 24 小时</option>
+          <option value="72">最近 3 天</option>
+          <option value="168">最近 7 天</option>
+        </select>
+        <select class="curve-select" id="curveCarrier"></select>
+      </div>
+      <div class="curve-summary" id="curveSummary"></div>
+      <div class="curve-chart" id="curveChart"><div class="curve-empty">选择节点后加载曲线。</div></div>
+      <div class="curve-legend" id="curveLegend"></div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -346,9 +386,12 @@
       ['loss','丢包'],
       ['max','MAX']
     ];
+    const curveMetrics={rtt:{label:'RTT',unit:'ms'},http:{label:'HTTP',unit:'ms'},jitter:{label:'抖动',unit:'ms'},loss:{label:'丢包',unit:'%'}};
+    const curvePalette=['#20d6a2','#69b7ff','#f4c95d','#ff8fa3','#b99cff','#69dfd5'];
     const $=id=>document.getElementById(id);
     let adminConfig=null, activeTab='providers', selectedCategory='all', selectedCountry='all', matrixSort='default', matrixSortDir='asc', matrixMetricCarrier='best', lastStatus=null, lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
     const matrixFilters={rtt:'',http:'',jitter:'',loss:''};
+    const curveState={node:null,samples:[],metric:'rtt',carrier:'all',hours:24,loading:false};
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
     async function apiJSON(url,options){
@@ -446,6 +489,137 @@
       $('matrixFilterReset').addEventListener('click',()=>{Object.keys(matrixFilters).forEach(key=>matrixFilters[key]='');renderMatrix(lastOverview)});
       document.querySelectorAll('#matrixTools input').forEach(input=>input.addEventListener('keydown',e=>{if(e.key==='Enter'){collectMatrixFilters();renderMatrix(lastOverview)}}));
     }
+    function curveMetricInfo(){return curveMetrics[curveState.metric]||curveMetrics.rtt}
+    function sampleCarrierKey(sample){return sample.carrier||sample.agentId||'unknown'}
+    function sampleCarrierName(sample){return sample.carrierLabel||carrierLabel(sample.carrier)||sample.agentName||sampleCarrierKey(sample)}
+    function curveValue(sample){
+      if(!sample)return null;
+      if(curveState.metric==='loss')return Number(sample.lossRate||0);
+      if(!sample.success)return null;
+      if(curveState.metric==='rtt')return Number(sample.tcpMs||0)||null;
+      if(curveState.metric==='http')return Number(sample.httpMs||0)||null;
+      if(curveState.metric==='jitter')return Number(sample.rttStdDevMs||0);
+      return null;
+    }
+    function fmtMetric(value){
+      if(value===null||value===undefined||!Number.isFinite(value))return'-';
+      const unit=curveMetricInfo().unit;
+      return (unit==='%'?value.toFixed(0):value.toFixed(value>=100?0:1))+unit;
+    }
+    function showCurveModal(){
+      $('curveModal').classList.add('open');
+      lockBody();
+    }
+    function closeCurve(){
+      $('curveModal').classList.remove('open');
+      unlockBody();
+    }
+    async function openCurve(row){
+      if(!row||!row.node)return;
+      curveState.node=row.node;
+      curveState.samples=[];
+      curveState.carrier='all';
+      showCurveModal();
+      renderCurve();
+      await loadCurveSamples();
+    }
+    async function loadCurveSamples(){
+      if(!curveState.node)return;
+      curveState.loading=true;
+      renderCurve();
+      const q=new URLSearchParams({node_id:curveState.node.id,hours:String(curveState.hours),limit:'5000'});
+      try{
+        const data=await apiJSON('/api/samples?'+q.toString(),{cache:'no-store'});
+        curveState.samples=Array.isArray(data)?data:[];
+      }finally{
+        curveState.loading=false;
+        renderCurve();
+      }
+    }
+    function carrierListForCurve(){
+      const map=new Map();
+      curveState.samples.forEach(sample=>{const key=sampleCarrierKey(sample);if(!map.has(key))map.set(key,sampleCarrierName(sample))});
+      return Array.from(map.entries()).sort((a,b)=>a[1].localeCompare(b[1],'zh-Hans-CN'));
+    }
+    function renderCurveCarrierOptions(carriers){
+      if(curveState.carrier!=='all'&&!carriers.some(c=>c[0]===curveState.carrier))curveState.carrier='all';
+      $('curveCarrier').innerHTML='<option value="all" '+(curveState.carrier==='all'?'selected':'')+'>全部线路</option>'+carriers.map(([key,label])=>'<option value="'+escapeHTML(key)+'" '+(curveState.carrier===key?'selected':'')+'>'+escapeHTML(label)+'</option>').join('');
+    }
+    function curveSamplesForView(){
+      return curveState.carrier==='all'?curveState.samples:curveState.samples.filter(sample=>sampleCarrierKey(sample)===curveState.carrier);
+    }
+    function renderCurve(){
+      const node=curveState.node;
+      $('curveTitle').textContent=node?node.name:'延迟曲线';
+      $('curveSub').textContent=node?[(node.provider||node.providerId),node.category||'默认',node.server+':'+node.port].filter(Boolean).join(' · '):'最近采样走势';
+      document.querySelectorAll('[data-curve-metric]').forEach(btn=>btn.classList.toggle('active',btn.dataset.curveMetric===curveState.metric));
+      $('curveHours').value=String(curveState.hours);
+      const carriers=carrierListForCurve();
+      renderCurveCarrierOptions(carriers);
+      if(curveState.loading){
+        $('curveSummary').innerHTML='';
+        $('curveChart').innerHTML='<div class="curve-empty">正在加载曲线...</div>';
+        $('curveLegend').innerHTML='';
+        return;
+      }
+      const samples=curveSamplesForView();
+      renderCurveSummary(samples);
+      renderCurveChart(samples,carriers);
+    }
+    function renderCurveSummary(samples){
+      const values=samples.map(curveValue).filter(value=>value!==null&&Number.isFinite(value));
+      const latest=[...samples].reverse().find(sample=>curveValue(sample)!==null);
+      const ok=samples.filter(sample=>sample.success).length;
+      const avg=values.length?values.reduce((a,b)=>a+b,0)/values.length:null;
+      const max=values.length?Math.max(...values):null;
+      $('curveSummary').innerHTML=[
+        ['采样',samples.length+' 次'],
+        ['可用',ok+' 次'],
+        ['平均',fmtMetric(avg)],
+        ['最新',latest?fmtMetric(curveValue(latest)):'-'],
+        ['峰值',fmtMetric(max)]
+      ].map(([k,v])=>'<div class="curve-stat"><span>'+k+'</span><strong>'+escapeHTML(v)+'</strong></div>').join('');
+    }
+    function renderCurveChart(samples,carrierEntries){
+      const metric=curveMetricInfo(), width=920, height=320, left=54, right=24, top=22, bottom=42;
+      if(!samples.length){$('curveChart').innerHTML='<div class="curve-empty">这个节点在当前时间范围内还没有采样。</div>';$('curveLegend').innerHTML='';return}
+      const now=Date.now(), start=now-curveState.hours*3600*1000, end=now, span=Math.max(end-start,1);
+      const groups=new Map();
+      samples.forEach(sample=>{const key=sampleCarrierKey(sample);if(!groups.has(key))groups.set(key,[]);groups.get(key).push(sample)});
+      const values=samples.map(curveValue).filter(value=>value!==null&&Number.isFinite(value));
+      if(!values.length){
+        const timeoutMarks=samples.filter(sample=>!sample.success).slice(-180).map(sample=>{const x=left+((new Date(sample.time).getTime()-start)/span)*(width-left-right);return'<rect class="curve-timeout" x="'+(x-1.8).toFixed(1)+'" y="'+(height-bottom+8)+'" width="3.6" height="10" rx="1"></rect>'}).join('');
+        $('curveChart').innerHTML='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="超时分布"><line class="curve-axis" x1="'+left+'" y1="'+(height-bottom+13)+'" x2="'+(width-right)+'" y2="'+(height-bottom+13)+'"></line>'+timeoutMarks+'<text x="'+(left+12)+'" y="'+(top+20)+'" fill="#8ca0ad" font-size="13">当前指标没有可用曲线点，可能全部超时。</text></svg>';
+        renderCurveLegend(groups,carrierEntries);
+        return;
+      }
+      let maxY=Math.max(...values);
+      if(curveState.metric==='loss')maxY=Math.max(100,maxY);
+      else maxY=Math.max(10,Math.ceil(maxY*1.18));
+      const xOf=t=>left+((new Date(t).getTime()-start)/span)*(width-left-right);
+      const yOf=value=>top+(1-(value/maxY))*(height-top-bottom);
+      const yTicks=[0,.25,.5,.75,1].map(r=>maxY*r);
+      let svg='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+escapeHTML(metric.label)+' 延迟曲线">';
+      yTicks.forEach(value=>{const y=yOf(value);svg+='<line class="curve-axis" x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(width-right)+'" y2="'+y.toFixed(1)+'"></line><text x="8" y="'+(y+4).toFixed(1)+'" fill="#718592" font-size="11" font-family="monospace">'+escapeHTML(fmtMetric(value))+'</text>'});
+      svg+='<text x="'+left+'" y="'+(height-12)+'" fill="#718592" font-size="11" font-family="monospace">'+escapeHTML(new Date(start).toLocaleTimeString())+'</text><text x="'+(width-right-70)+'" y="'+(height-12)+'" fill="#718592" font-size="11" font-family="monospace">'+escapeHTML(new Date(end).toLocaleTimeString())+'</text>';
+      let colorIndex=0;
+      for(const [key,list] of groups.entries()){
+        const color=curvePalette[colorIndex++%curvePalette.length];
+        const points=list.map(sample=>({sample,value:curveValue(sample)})).filter(p=>p.value!==null&&Number.isFinite(p.value)).map(p=>[xOf(p.sample.time),yOf(p.value),p.value]);
+        if(points.length>1)svg+='<polyline class="curve-line" stroke="'+color+'" points="'+points.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ')+'"></polyline>';
+        points.slice(-80).forEach(p=>{svg+='<circle class="curve-point" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.2" fill="'+color+'"></circle>'});
+        if(points.length===1)svg+='<circle class="curve-point" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="4.5" fill="'+color+'"></circle>';
+      }
+      samples.filter(sample=>!sample.success).slice(-180).forEach(sample=>{const x=xOf(sample.time);svg+='<rect class="curve-timeout" x="'+(x-1.8).toFixed(1)+'" y="'+(height-bottom+8)+'" width="3.6" height="10" rx="1"></rect>'});
+      svg+='</svg>';
+      $('curveChart').innerHTML=svg;
+      renderCurveLegend(groups,carrierEntries);
+    }
+    function renderCurveLegend(groups,carrierEntries){
+      const labels=new Map(carrierEntries);
+      let i=0;
+      $('curveLegend').innerHTML=Array.from(groups.keys()).map(key=>'<span class="legend-item"><span class="legend-dot" style="background:'+curvePalette[i++%curvePalette.length]+'"></span>'+escapeHTML(labels.get(key)||key)+'</span>').join('')+'<span class="legend-item"><span class="legend-dot" style="background:#ff6b6b"></span>超时</span>';
+    }
     function countryText(row){const n=row&&row.node?row.node:{};return [n.name,n.server,n.provider,n.category].filter(Boolean).join(' ').replace(/[_-]+/g,' ')}
     function countryForRow(row){const text=countryText(row);return countries.find(c=>c.patterns.some(pattern=>pattern.test(text)))||unknownCountry}
     function flagHTML(country){
@@ -539,7 +713,8 @@
       $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+countryLabel+' · '+countLabel+' · '+carrierLabelText+' · '+sortLabel+(filters.length?' · '+filters.join(' / '):'');
       if(!filtered.length){$('matrix').innerHTML='<div class="empty">'+(countryFiltered.length?'当前指标筛选没有节点。请放宽 RTT / HTTP / 抖动 / 丢包上限。':'当前分类没有节点。请在管理设置里检查机场订阅。')+'</div>';return}
       const metricHead=matrixCarriers.map(c=>'<th>'+escapeHTML(c[1])+'</th>').join('');
-      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
+      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span><button type="button" class="node-curve" data-curve-node="'+escapeHTML(row.node.id)+'">曲线</button></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
+      document.querySelectorAll('[data-curve-node]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();const row=lastOverview.find(item=>item.node&&item.node.id===btn.dataset.curveNode);openCurve(row).catch(err=>toast(err.message,true))}));
     }
     function renderProviders(providers,statuses){
       const counts={};(statuses||[]).forEach(s=>counts[s.id]=s.nodeCount||0);
@@ -643,7 +818,11 @@
       $('installHint').textContent=res.tokenSet?'脚本会优先从当前主控下载 agent 二进制，失败后回落到 GitHub Release。':'主控还没有配置 Token，请先保存 Token 后再复制命令。';
     }
     document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchSettingsTab(btn.dataset.tab)));
-    $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('settingsModal').classList.contains('open'))closeSettings()});
+    $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('curveModal').classList.contains('open'))closeCurve();else if(e.key==='Escape'&&$('settingsModal').classList.contains('open'))closeSettings()});
+    $('curveClose').addEventListener('click',closeCurve);$('curveModal').addEventListener('click',e=>{if(e.target===$('curveModal'))closeCurve()});
+    document.querySelectorAll('[data-curve-metric]').forEach(btn=>btn.addEventListener('click',()=>{curveState.metric=btn.dataset.curveMetric;renderCurve()}));
+    $('curveHours').addEventListener('change',()=>{curveState.hours=Number($('curveHours').value)||24;loadCurveSamples().catch(e=>toast(e.message,true))});
+    $('curveCarrier').addEventListener('change',()=>{curveState.carrier=$('curveCarrier').value;renderCurve()});
     $('reloadBtn').addEventListener('click',()=>load().catch(e=>toast(e.message,true)));
     $('refreshBtn').addEventListener('click',async()=>{$('refreshBtn').disabled=true;try{const r=await fetch('/api/providers/refresh',{method:'POST'}).then(r=>r.json());if(r.error)toast(r.error,true);else toast('订阅已刷新');await load()}finally{$('refreshBtn').disabled=false}});
     $('addProviderBtn').addEventListener('click',()=>{markSettingsDirty();adminConfig.providers.push({id:'new-provider',name:'新机场',category:'默认',subscriptionUrl:'',subscriptionFile:''});renderProviders(adminConfig.providers,[])});

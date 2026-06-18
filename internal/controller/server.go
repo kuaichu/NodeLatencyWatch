@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -446,6 +447,27 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSamples(w http.ResponseWriter, r *http.Request) {
+	cfg := s.configSnapshot()
+	agentCarriers := configuredAgentCarriers(cfg)
+	limit := 2000
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 10000 {
+		limit = 10000
+	}
+	hours := 24
+	if raw := strings.TrimSpace(r.URL.Query().Get("hours")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			hours = parsed
+		}
+	}
+	if hours > 168 {
+		hours = 168
+	}
+	carrierFilter := model.NormalizeCarrier(r.URL.Query().Get("carrier"))
 	nodeID := strings.TrimSpace(r.URL.Query().Get("node_id"))
 	if nodeID == "" {
 		samples, err := s.store.LatestSamples(1000)
@@ -453,13 +475,21 @@ func (s *Server) handleSamples(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, map[string]string{"error": err.Error()})
 			return
 		}
+		samples = filterSamplesForAgents(samples, agentCarriers)
+		if carrierFilter != "unknown" {
+			samples = filterSamplesByCarrier(samples, carrierFilter)
+		}
 		writeJSON(w, samples)
 		return
 	}
-	samples, err := s.store.SamplesForNode(nodeID, time.Now().Add(-24*time.Hour), 2000)
+	samples, err := s.store.SamplesForNode(nodeID, time.Now().Add(-time.Duration(hours)*time.Hour), limit)
 	if err != nil {
 		writeJSON(w, map[string]string{"error": err.Error()})
 		return
+	}
+	samples = filterSamplesForAgents(samples, agentCarriers)
+	if carrierFilter != "unknown" {
+		samples = filterSamplesByCarrier(samples, carrierFilter)
 	}
 	writeJSON(w, samples)
 }
@@ -971,6 +1001,19 @@ func filterSamplesForAgents(samples []model.NodeSample, agentCarriers map[string
 			continue
 		}
 		if carrier == "unknown" || carrier == model.NormalizeCarrier(sample.Carrier) {
+			out = append(out, sample)
+		}
+	}
+	return out
+}
+
+func filterSamplesByCarrier(samples []model.NodeSample, carrier string) []model.NodeSample {
+	if len(samples) == 0 {
+		return nil
+	}
+	out := samples[:0]
+	for _, sample := range samples {
+		if model.NormalizeCarrier(sample.Carrier) == carrier {
 			out = append(out, sample)
 		}
 	}
