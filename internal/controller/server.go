@@ -211,16 +211,25 @@ func (s *Server) handleInstallCommand(w http.ResponseWriter, r *http.Request) {
 	cfg := s.configSnapshot()
 	controllerURL := publicBaseURL(r)
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
-	if id == "" {
-		id = "agent-$(hostname)"
+	dynamicID := id == "" || isHostnamePlaceholder(id)
+	if dynamicID {
+		id = "agent-$(hostname -s)"
 	}
 	name := strings.TrimSpace(r.URL.Query().Get("name"))
-	if name == "" {
+	dynamicName := dynamicID && (name == "" || name == "新 Agent" || isHostnamePlaceholder(name))
+	if dynamicName {
+		name = "$(hostname -s)"
+	} else if name == "" {
 		name = id
 	}
 	probeSource := strings.TrimSpace(r.URL.Query().Get("probe_source"))
+	dynamicProbeSource := false
 	if probeSource == "" {
 		probeSource = name
+		dynamicProbeSource = dynamicName
+	} else if isHostnamePlaceholder(probeSource) {
+		probeSource = "$(hostname -s)"
+		dynamicProbeSource = true
 	}
 	carrier := model.NormalizeCarrier(r.URL.Query().Get("carrier"))
 	token := strings.TrimSpace(cfg.Agent.Token)
@@ -229,9 +238,9 @@ func (s *Server) handleInstallCommand(w http.ResponseWriter, r *http.Request) {
 		"|",
 		"sudo bash -s --",
 		"--controller " + shellQuote(controllerURL),
-		"--id " + shellQuote(id),
-		"--name " + shellQuote(name),
-		"--probe-source " + shellQuote(probeSource),
+		"--id " + shellValue(id, dynamicID),
+		"--name " + shellValue(name, dynamicName),
+		"--probe-source " + shellValue(probeSource, dynamicProbeSource),
 		"--carrier " + shellQuote(carrier),
 	}
 	if token != "" {
@@ -949,6 +958,18 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
 }
 
+func shellValue(value string, dynamic bool) string {
+	if dynamic {
+		return `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
+	}
+	return shellQuote(value)
+}
+
+func isHostnamePlaceholder(value string) bool {
+	value = strings.TrimSpace(value)
+	return value == "agent-$(hostname)" || value == "agent-$(hostname -s)" || value == "$(hostname)" || value == "$(hostname -s)"
+}
+
 func agentInstallScript() string {
 	return `#!/usr/bin/env bash
 set -euo pipefail
@@ -991,8 +1012,18 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 if [ -z "$CONTROLLER_URL" ] || [ -z "$TOKEN" ] || [ -z "$AGENT_ID" ]; then
-  usage >&2
-  exit 1
+  if [ -z "$CONTROLLER_URL" ] || [ -z "$TOKEN" ]; then
+    usage >&2
+    exit 1
+  fi
+fi
+
+HOST_SHORT="$(hostname -s 2>/dev/null || hostname)"
+if [ -z "$AGENT_ID" ] || [ "$AGENT_ID" = 'agent-$(hostname)' ] || [ "$AGENT_ID" = 'agent-$(hostname -s)' ]; then
+  AGENT_ID="agent-$HOST_SHORT"
+fi
+if [ -z "$AGENT_NAME" ] || [ "$AGENT_NAME" = '新 Agent' ] || [ "$AGENT_NAME" = '$(hostname)' ] || [ "$AGENT_NAME" = '$(hostname -s)' ] || [ "$AGENT_NAME" = 'agent-$(hostname)' ] || [ "$AGENT_NAME" = 'agent-$(hostname -s)' ]; then
+  AGENT_NAME="$AGENT_ID"
 fi
 
 AGENT_NAME="${AGENT_NAME:-$AGENT_ID}"

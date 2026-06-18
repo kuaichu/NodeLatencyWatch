@@ -17,6 +17,7 @@ import (
 )
 
 func Run(cfg *config.Config) {
+	normalizeAgentIdentity(cfg)
 	client := &http.Client{Timeout: 60 * time.Second}
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
@@ -163,4 +164,22 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func normalizeAgentIdentity(cfg *config.Config) {
+	host, err := os.Hostname()
+	if err != nil || strings.TrimSpace(host) == "" {
+		host = "unknown"
+	}
+	if isHostnamePlaceholder(cfg.Agent.ID) {
+		cfg.Agent.ID = "agent-" + host
+	}
+	if strings.TrimSpace(cfg.Agent.Name) == "" || cfg.Agent.Name == "新 Agent" || isHostnamePlaceholder(cfg.Agent.Name) {
+		cfg.Agent.Name = cfg.Agent.ID
+	}
+}
+
+func isHostnamePlaceholder(value string) bool {
+	value = strings.TrimSpace(value)
+	return value == "agent-$(hostname)" || value == "agent-$(hostname -s)" || value == "$(hostname)" || value == "$(hostname -s)"
 }

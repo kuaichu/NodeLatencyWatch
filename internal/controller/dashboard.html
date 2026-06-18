@@ -245,6 +245,16 @@
               <div id="agentEditor"></div>
             </div>
             <div class="settings-card">
+              <div class="settings-card-head">
+                <div>
+                  <div class="settings-card-title">待登记 Agent</div>
+                  <div class="small">已安装并上报，但还没有写入配置的 Agent 会出现在这里。</div>
+                </div>
+                <button class="btn" id="refreshDiscoveredAgentsBtn">刷新</button>
+              </div>
+              <div id="discoveredAgentEditor"></div>
+            </div>
+            <div class="settings-card">
               <div class="settings-card-title">通信 Token</div>
               <div class="form-grid" style="margin-top:12px">
                 <div class="field"><label>新 Token</label><input id="agentToken" type="password" placeholder="留空则保持不变"></div>
@@ -284,7 +294,7 @@
   <script>
     const carriers=[["telecom","电信"],["unicom","联通"],["mobile","移动"],["unknown","未知"]];
     const $=id=>document.getElementById(id);
-    let adminConfig=null, activeTab='providers', selectedCategory='all', lastOverview=[], matrixCarriers=[], settingsDirty=false, activeSubProviderId='';
+    let adminConfig=null, activeTab='providers', selectedCategory='all', lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
     async function apiJSON(url,options){
@@ -307,23 +317,25 @@
     function statusBadge(status){if(status==='online')return'<span class="badge">在线</span>';if(status==='stale')return'<span class="badge warn">过期</span>';return'<span class="badge bad">离线</span>'}
     function statusLabel(status){return status==='online'?'在线':status==='stale'?'过期':'离线'}
     async function load(){
-      const [status,overview,cfg,agents,providers]=await Promise.all([
+      const [status,overview,cfg,agents,allAgents,providers]=await Promise.all([
         fetch('/api/status',{cache:'no-store'}).then(r=>r.json()),
         fetch('/api/overview',{cache:'no-store'}).then(r=>r.json()),
         fetch('/api/admin/config',{cache:'no-store'}).then(r=>r.json()),
         fetch('/api/admin/agents',{cache:'no-store'}).then(r=>r.json()),
+        fetch('/api/admin/agents?include_unconfigured=1',{cache:'no-store'}).then(r=>r.json()),
         fetch('/api/admin/providers',{cache:'no-store'}).then(r=>r.json())
       ]);
       const editingSettings=settingsOpen()||settingsDirty;
       if(!editingSettings||!adminConfig)adminConfig=cfg;
       lastOverview=Array.isArray(overview)?overview:[];
+      lastAgentStatuses=Array.isArray(allAgents)?allAgents:[];
       matrixCarriers=carriersForAgents(cfg.agents||[]);
       $('nodeCount').textContent=status.nodeCount||0;$('providerCount').textContent=status.providerCount||0;$('agentCount').textContent=status.agentCount||0;$('interval').textContent=((status.probe&&status.probe.intervalSeconds)||0)+'s';
       $('liveText').textContent='最后刷新 '+new Date().toLocaleTimeString();$('updatedAt').textContent='更新于 '+new Date().toLocaleTimeString();
       const cats=[...new Set((cfg.providers||[]).map(p=>p.category||'默认'))].sort();
       if(selectedCategory!=='all'&&!cats.includes(selectedCategory))selectedCategory='all';
       renderCategoryRail(cats);renderHero(status,cfg);renderStatus(status);renderAgentsGrid(Array.isArray(agents)?agents.filter(agentVisible):[]);renderMatrix(lastOverview);
-      if(!editingSettings){renderProviders(cfg.providers||[],Array.isArray(providers)?providers:[]);renderAgentEditor(cfg.agents||[]);renderSettings(cfg)}
+      if(!editingSettings){renderProviders(cfg.providers||[],Array.isArray(providers)?providers:[]);renderAgentEditor(cfg.agents||[],Array.isArray(allAgents)?allAgents:[]);renderSettings(cfg)}
     }
     function renderHero(status,cfg){
       const label=selectedCategory==='all'?'全部机场':selectedCategory;
@@ -363,10 +375,32 @@
       document.querySelectorAll('[data-remove-provider]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();const removed=adminConfig.providers.splice(Number(btn.dataset.removeProvider),1)[0];if(removed&&removed.id===activeSubProviderId)closeSubscriptionEditor();renderProviders(adminConfig.providers,statuses)}));
       document.querySelectorAll('[data-provider-field]').forEach(el=>el.addEventListener('input',markSettingsDirty));
     }
-    function renderAgentEditor(agents){
+    function renderAgentEditor(agents,statuses){
       $('agentEditor').innerHTML=agents.length?agents.map((a,i)=>'<div class="editor-card" data-agent-index="'+i+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(a.name||a.id)+'</div><div class="editor-sub">'+escapeHTML(a.id||'')+' · '+escapeHTML(a.probeSource||'-')+'</div></div><button class="btn btn-danger" data-remove-agent="'+i+'">删除</button></div><div class="form-grid"><div class="field"><label>Agent ID</label><input data-agent-field="id" value="'+escapeHTML(a.id||'')+'"></div><div class="field"><label>显示名</label><input data-agent-field="name" value="'+escapeHTML(a.name||'')+'"></div><div class="field"><label>地区 / 探测源</label><input data-agent-field="probeSource" value="'+escapeHTML(a.probeSource||'')+'"></div><div class="field"><label>运营商</label><select data-agent-field="carrier">'+carrierOptions(a.carrier||'unknown')+'</select></div></div></div>').join(''):'<div class="empty">还没有配置 Agent。</div>';
-      document.querySelectorAll('[data-remove-agent]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();adminConfig.agents.splice(Number(btn.dataset.removeAgent),1);renderAgentEditor(adminConfig.agents)}));
+      document.querySelectorAll('[data-remove-agent]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();adminConfig.agents.splice(Number(btn.dataset.removeAgent),1);renderAgentEditor(adminConfig.agents,lastAgentStatuses)}));
       document.querySelectorAll('[data-agent-field]').forEach(el=>el.addEventListener('input',()=>{markSettingsDirty();loadInstallCommand().catch(console.error)}));
+      renderDiscoveredAgents(statuses||[]);
+    }
+    function renderDiscoveredAgents(statuses){
+      const discovered=(statuses||[]).filter(a=>a&&!a.configured&&agentHasReported(a));
+      if(!discovered.length){$('discoveredAgentEditor').innerHTML='<div class="empty">暂无待登记 Agent。安装完成并首次上报后会显示在这里。</div>';return}
+      $('discoveredAgentEditor').innerHTML=discovered.map((a,i)=>'<div class="editor-card"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(a.name||a.id)+'</div><div class="editor-sub">'+escapeHTML(a.id)+' · '+escapeHTML(a.probeSource||'-')+' · '+statusLabel(a.status)+'</div></div><button class="btn btn-primary" data-register-agent="'+i+'">登记</button></div><div class="agent-meta"><div class="agent-meta-item"><span>线路</span><strong>'+escapeHTML(a.carrierLabel||carrierLabel(a.carrier))+'</strong></div><div class="agent-meta-item"><span>结果</span><strong>'+Number(a.resultCount||0)+'</strong></div><div class="agent-meta-item"><span>最近上报</span><strong>'+((a.lastSeen&&!String(a.lastSeen).startsWith('0001'))?new Date(a.lastSeen).toLocaleTimeString():'-')+'</strong></div><div class="agent-meta-item"><span>状态</span><strong>'+statusLabel(a.status)+'</strong></div></div></div>').join('');
+      document.querySelectorAll('[data-register-agent]').forEach(btn=>btn.addEventListener('click',()=>registerDiscoveredAgent(discovered[Number(btn.dataset.registerAgent)]).catch(e=>toast(e.message,true))));
+    }
+    async function registerDiscoveredAgent(agent){
+      if(!agent||!agent.id)return;
+      adminConfig.agents=collectAgents();
+      if(!adminConfig.agents.some(a=>a.id.toLowerCase()===agent.id.toLowerCase())){
+        adminConfig.agents.push({id:agent.id,name:agent.name||agent.id,probeSource:agent.probeSource||'',carrier:agent.carrier||'unknown'});
+      }
+      renderAgentEditor(adminConfig.agents,[]);
+      await saveConfig({agents:adminConfig.agents});
+    }
+    async function refreshDiscoveredAgents(){
+      const statuses=await apiJSON('/api/admin/agents?include_unconfigured=1',{cache:'no-store'});
+      lastAgentStatuses=Array.isArray(statuses)?statuses:[];
+      renderDiscoveredAgents(lastAgentStatuses);
+      toast('待登记 Agent 已刷新');
     }
     function renderSettings(cfg){$('probeInterval').value=cfg.probe?.intervalSeconds||300;$('probeTimeout').value=cfg.probe?.timeoutSeconds||5;$('probeAttempts').value=cfg.probe?.attempts||3;$('probeConcurrency').value=cfg.probe?.maxConcurrency||32;$('probeTLS').value=cfg.probe?.tlsMode||'auto';$('agentTTL').value=cfg.agentReportTtl||900;$('tokenHint').textContent=cfg.agentTokenSet?'当前已配置 Token，留空保存则保持不变。':'当前未配置 Token。'}
     function collectProviders(){return Array.from(document.querySelectorAll('[data-provider-index]')).map(card=>{const get=f=>card.querySelector('[data-provider-field="'+f+'"]').value.trim();return{id:get('id'),name:get('name'),category:get('category')||'默认',subscriptionUrl:get('subscriptionUrl'),subscriptionFile:get('subscriptionFile')}})}
@@ -429,8 +463,8 @@
       await load();
     }
     async function loadInstallCommand(){
-      const first=collectAgents()[0]||{id:'agent-$(hostname)',name:'新 Agent',probeSource:'城市运营商',carrier:'unknown'};
-      const q=new URLSearchParams({id:first.id||'agent-$(hostname)',name:first.name||first.id||'Agent',probe_source:first.probeSource||first.name||'Agent',carrier:first.carrier||'unknown'});
+      const first=collectAgents()[0]||{id:'',name:'',probeSource:'',carrier:'unknown'};
+      const q=new URLSearchParams({id:first.id||'',name:first.name||'',probe_source:first.probeSource||'',carrier:first.carrier||'unknown'});
       const res=await fetch('/api/admin/install-command?'+q.toString(),{cache:'no-store'}).then(r=>r.json());
       $('installCommand').value=res.command||'';
       $('installHint').textContent=res.tokenSet?'脚本会优先从当前主控下载 agent 二进制，失败后回落到 GitHub Release。':'主控还没有配置 Token，请先保存 Token 后再复制命令。';
@@ -440,7 +474,8 @@
     $('reloadBtn').addEventListener('click',()=>load().catch(e=>toast(e.message,true)));
     $('refreshBtn').addEventListener('click',async()=>{$('refreshBtn').disabled=true;try{const r=await fetch('/api/providers/refresh',{method:'POST'}).then(r=>r.json());if(r.error)toast(r.error,true);else toast('订阅已刷新');await load()}finally{$('refreshBtn').disabled=false}});
     $('addProviderBtn').addEventListener('click',()=>{markSettingsDirty();adminConfig.providers.push({id:'new-provider',name:'新机场',category:'默认',subscriptionUrl:'',subscriptionFile:''});renderProviders(adminConfig.providers,[])});
-    $('addAgentBtn').addEventListener('click',()=>{markSettingsDirty();const n=adminConfig.agents.length+1;adminConfig.agents.push({id:'agent-'+n,name:'新 Agent '+n,probeSource:'城市运营商',carrier:'unknown'});renderAgentEditor(adminConfig.agents);loadInstallCommand().catch(console.error)});
+    $('addAgentBtn').addEventListener('click',()=>{markSettingsDirty();const n=adminConfig.agents.length+1;adminConfig.agents.push({id:'agent-'+n,name:'新 Agent '+n,probeSource:'城市运营商',carrier:'unknown'});renderAgentEditor(adminConfig.agents,[]);loadInstallCommand().catch(console.error)});
+    $('refreshDiscoveredAgentsBtn').addEventListener('click',()=>refreshDiscoveredAgents().catch(e=>toast(e.message,true)));
     $('copyInstallBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('installCommand').value);toast('安装命令已复制')}catch(e){$('installCommand').select();toast('已选中命令，可手动复制')}});
     $('loadSubBtn').addEventListener('click',()=>loadProviderSubscription(false).catch(e=>toast(e.message,true)));
     $('fetchRemoteSubBtn').addEventListener('click',()=>loadProviderSubscription(true).catch(e=>toast(e.message,true)));
