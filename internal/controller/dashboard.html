@@ -141,11 +141,11 @@
     .curve-card{width:min(1040px,calc(100vw - 48px))}
     .curve-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:14px}.curve-head h2{overflow-wrap:anywhere}
     .curve-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-    .curve-chip{min-height:32px;padding:0 11px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.04);color:#9eb0bc;font-size:12px;font-weight:850;cursor:pointer}.curve-chip.active{border-color:rgba(32,214,162,.4);background:rgba(32,214,162,.12);color:#dffcf2}
+    .curve-chip{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 11px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.04);color:#9eb0bc;font-size:12px;font-weight:850;cursor:pointer}.curve-chip.active{border-color:rgba(32,214,162,.4);background:rgba(32,214,162,.12);color:#dffcf2}.curve-chip:disabled{opacity:.45;cursor:not-allowed}
     .curve-select{height:34px;border:1px solid rgba(132,162,184,.16);border-radius:10px;background:#071018;color:#dceaf0;padding:0 10px;font:12px var(--mono)}
     .curve-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}.curve-stat{border:1px solid rgba(132,162,184,.13);border-radius:12px;padding:10px;background:rgba(255,255,255,.035)}.curve-stat span{display:block;color:#718592;font-size:11px}.curve-stat strong{display:block;margin-top:5px;font-family:var(--mono);font-size:16px}
     .curve-chart{position:relative;height:360px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));overflow:hidden}
-    .curve-chart svg{width:100%;height:100%;display:block}.curve-axis{stroke:rgba(132,162,184,.16);stroke-width:1}.curve-line{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.curve-point{stroke:#081018;stroke-width:1}.curve-timeout{fill:rgba(255,107,107,.78)}
+    .curve-chart svg{width:100%;height:100%;display:block}.curve-axis{stroke:rgba(132,162,184,.16);stroke-width:1}.curve-cap-line{stroke:rgba(244,201,93,.46);stroke-width:1;stroke-dasharray:4 6}.curve-clip-label{fill:#f4c95d;font-weight:850}.curve-line{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}.curve-point{stroke:#081018;stroke-width:1}.curve-point.clipped{stroke:#f4c95d;stroke-width:1.8}.curve-timeout{fill:rgba(255,107,107,.78)}
     .curve-legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;color:#9aaeba;font-size:12px}.legend-item{display:inline-flex;align-items:center;gap:6px}.legend-dot{width:10px;height:10px;border-radius:50%}
     .curve-empty{height:100%;display:grid;place-items:center;color:var(--muted);text-align:center;padding:24px}
     .toast{position:fixed;right:18px;bottom:18px;z-index:20;padding:12px 15px;border:1px solid rgba(32,214,162,.45);border-radius:12px;background:#0b1620;color:var(--text);box-shadow:0 18px 50px rgba(0,0,0,.35);opacity:0;transform:translateY(8px);transition:.18s ease;pointer-events:none}
@@ -360,6 +360,7 @@
         <button class="curve-chip" data-curve-metric="http">HTTP</button>
         <button class="curve-chip" data-curve-metric="jitter">抖动</button>
         <button class="curve-chip" data-curve-metric="loss">丢包</button>
+        <button class="curve-chip active" id="curveDespike" type="button" aria-pressed="true">消峰</button>
         <select class="curve-select" id="curveHours">
           <option value="1">最近 1 小时</option>
           <option value="6">最近 6 小时</option>
@@ -417,7 +418,7 @@
     const $=id=>document.getElementById(id);
     let adminConfig=null, activeTab='providers', selectedCategory='all', selectedCountry='all', matrixSort='default', matrixSortDir='asc', matrixMetricCarrier='best', lastStatus=null, lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
     const matrixFilters={rtt:'',http:'',jitter:'',loss:''};
-    const curveState={node:null,samples:[],metric:'rtt',carrier:'all',hours:24,loading:false};
+    const curveState={node:null,samples:[],metric:'rtt',carrier:'all',hours:24,loading:false,despike:true};
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
     async function apiJSON(url,options){
@@ -546,6 +547,26 @@
       const unit=curveMetricInfo().unit;
       return (unit==='%'?value.toFixed(0):value.toFixed(value>=100?0:1))+unit;
     }
+    function percentileFloor(sortedValues,ratio){
+      if(!sortedValues.length)return null;
+      const index=Math.max(0,Math.min(sortedValues.length-1,Math.floor((sortedValues.length-1)*ratio)));
+      return sortedValues[index];
+    }
+    function curveRenderScale(values){
+      const maxValue=Math.max(...values);
+      if(curveState.metric==='loss')return{maxY:Math.max(100,maxValue),cap:null,clipped:false};
+      const fullMaxY=Math.max(10,Math.ceil(maxValue*1.18));
+      if(!curveState.despike||values.length<3)return{maxY:fullMaxY,cap:null,clipped:false};
+      const sorted=values.filter(value=>Number.isFinite(value)&&value>=0).sort((a,b)=>a-b);
+      const median=percentileFloor(sorted,.5)||0;
+      const p90=percentileFloor(sorted,.9)||maxValue;
+      const p95=percentileFloor(sorted,.95)||p90;
+      const robustHigh=values.length<20?p90:Math.min(p95,Math.max(p90,median*2.4));
+      const cap=Math.max(10,robustHigh*1.18,median*1.8);
+      const gap=Math.max(35,median*.55,p90*.25);
+      if(maxValue<=cap*1.35||maxValue-cap<=gap)return{maxY:fullMaxY,cap:null,clipped:false};
+      return{maxY:Math.max(10,Math.ceil(cap*1.18)),cap,clipped:true};
+    }
     function showCurveModal(){
       $('curveModal').classList.add('open');
       lockBody();
@@ -593,6 +614,10 @@
       $('curveTitle').textContent=node?node.name:'延迟曲线';
       $('curveSub').textContent=node?[(node.provider||node.providerId),node.category||'默认',node.server+':'+node.port].filter(Boolean).join(' · '):'最近采样走势';
       document.querySelectorAll('[data-curve-metric]').forEach(btn=>btn.classList.toggle('active',btn.dataset.curveMetric===curveState.metric));
+      const despikeBtn=$('curveDespike'), canDespike=curveState.metric!=='loss';
+      despikeBtn.disabled=!canDespike;
+      despikeBtn.classList.toggle('active',curveState.despike&&canDespike);
+      despikeBtn.setAttribute('aria-pressed',String(curveState.despike&&canDespike));
       $('curveHours').value=String(curveState.hours);
       const carriers=carrierListForCurve();
       renderCurveCarrierOptions(carriers);
@@ -670,23 +695,26 @@
         renderCurveLegend(groups,carrierEntries);
         return;
       }
-      let maxY=Math.max(...values);
-      if(curveState.metric==='loss')maxY=Math.max(100,maxY);
-      else maxY=Math.max(10,Math.ceil(maxY*1.18));
+      const scale=curveRenderScale(values), maxY=scale.maxY;
+      const plotValue=value=>scale.cap!==null?Math.min(value,scale.cap):value;
       const xOf=t=>left+((new Date(t).getTime()-start)/span)*(width-left-right);
       const yOf=value=>top+(1-(value/maxY))*(height-top-bottom);
       const yTicks=[0,.25,.5,.75,1].map(r=>maxY*r);
       let svg='<svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="'+escapeHTML(metric.label)+' 延迟曲线">';
       yTicks.forEach(value=>{const y=yOf(value);svg+='<line class="curve-axis" x1="'+left+'" y1="'+y.toFixed(1)+'" x2="'+(width-right)+'" y2="'+y.toFixed(1)+'"></line><text x="'+(compact?7:8)+'" y="'+(y+axisFont*.36).toFixed(1)+'" fill="#90a6b3" font-size="'+axisFont+'" font-family="monospace" font-weight="750">'+escapeHTML(fmtMetric(value))+'</text>'});
+      if(scale.clipped){
+        const capY=yOf(scale.cap), labelY=Math.max(top+14,capY-6);
+        svg+='<line class="curve-cap-line" x1="'+left+'" y1="'+capY.toFixed(1)+'" x2="'+(width-right)+'" y2="'+capY.toFixed(1)+'"></line><text class="curve-clip-label" text-anchor="end" x="'+(width-right-4)+'" y="'+labelY.toFixed(1)+'" font-size="'+(compact?12:11)+'" font-family="monospace">消峰 '+escapeHTML(fmtMetric(scale.cap))+'</text>';
+      }
       svg+='<text x="'+left+'" y="'+(height-16)+'" fill="#90a6b3" font-size="'+timeFont+'" font-family="monospace" font-weight="750">'+escapeHTML(new Date(start).toLocaleTimeString())+'</text><text text-anchor="end" x="'+(width-right)+'" y="'+(height-16)+'" fill="#90a6b3" font-size="'+timeFont+'" font-family="monospace" font-weight="750">'+escapeHTML(new Date(end).toLocaleTimeString())+'</text>';
       let colorIndex=0;
       for(const [key,list] of groups.entries()){
         const color=curvePalette[colorIndex++%curvePalette.length];
         const records=curvePlotRecords(list.map(sample=>({time:new Date(sample.time).getTime(),value:curveValue(sample)})).filter(p=>Number.isFinite(p.time)&&p.value!==null&&Number.isFinite(p.value)).sort((a,b)=>a.time-b.time),compact);
-        const points=records.map(p=>[xOf(p.time),yOf(p.value),p.value]);
+        const points=records.map(p=>[xOf(p.time),yOf(plotValue(p.value)),p.value,scale.cap!==null&&p.value>scale.cap]);
         if(points.length>1)svg+='<path class="curve-line" stroke="'+color+'" d="'+curvePath(points)+'"></path>';
-        if(points.length>1)points.forEach(p=>{svg+='<circle class="curve-point" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+pointRadius+'" fill="'+color+'"></circle>'});
-        else if(points.length===1)svg+='<circle class="curve-point" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="'+singlePointRadius+'" fill="'+color+'"></circle>';
+        if(points.length>1)points.forEach(p=>{svg+='<circle class="curve-point '+(p[3]?'clipped':'')+'" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+pointRadius+'" fill="'+color+'"><title>'+escapeHTML(fmtMetric(p[2]))+'</title></circle>'});
+        else if(points.length===1)svg+='<circle class="curve-point '+(points[0][3]?'clipped':'')+'" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="'+singlePointRadius+'" fill="'+color+'"><title>'+escapeHTML(fmtMetric(points[0][2]))+'</title></circle>';
       }
       samples.filter(sample=>!sample.success).slice(-180).forEach(sample=>{const x=xOf(sample.time);svg+='<rect class="curve-timeout" x="'+(x-timeoutWidth/2).toFixed(1)+'" y="'+(height-bottom+8)+'" width="'+timeoutWidth+'" height="'+timeoutHeight+'" rx="1.4"></rect>'});
       svg+='</svg>';
@@ -899,6 +927,7 @@
     $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('click',()=>closeToolSelects());document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeToolSelects();if($('curveModal').classList.contains('open'))closeCurve();else if($('settingsModal').classList.contains('open'))closeSettings()}});
     $('curveClose').addEventListener('click',closeCurve);$('curveModal').addEventListener('click',e=>{if(e.target===$('curveModal'))closeCurve()});
     document.querySelectorAll('[data-curve-metric]').forEach(btn=>btn.addEventListener('click',()=>{curveState.metric=btn.dataset.curveMetric;renderCurve()}));
+    $('curveDespike').addEventListener('click',()=>{curveState.despike=!curveState.despike;renderCurve()});
     $('curveHours').addEventListener('change',()=>{curveState.hours=Number($('curveHours').value)||24;loadCurveSamples().catch(e=>toast(e.message,true))});
     $('curveCarrier').addEventListener('change',()=>{curveState.carrier=$('curveCarrier').value;renderCurve()});
     $('reloadBtn').addEventListener('click',()=>load().catch(e=>toast(e.message,true)));
