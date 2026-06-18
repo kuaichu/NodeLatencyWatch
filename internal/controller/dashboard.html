@@ -193,7 +193,6 @@
       </div>
       <div class="top-actions">
         <div class="pill"><span id="liveText">等待刷新</span></div>
-        <button class="btn" id="refreshBtn">刷新订阅</button>
         <button class="btn" id="reloadBtn">立即刷新</button>
         <button class="btn btn-primary" id="settingsBtn">管理设置</button>
       </div>
@@ -1008,7 +1007,6 @@
     $('curveHours').addEventListener('change',()=>{curveState.hours=Number($('curveHours').value)||24;loadCurveSamples().catch(e=>toast(e.message,true))});
     $('curveCarrier').addEventListener('change',()=>{curveState.carrier=$('curveCarrier').value;renderCurve()});
     $('reloadBtn').addEventListener('click',()=>load().catch(e=>toast(e.message,true)));
-    $('refreshBtn').addEventListener('click',async()=>{$('refreshBtn').disabled=true;try{const r=await fetch('/api/providers/refresh',{method:'POST'}).then(r=>r.json());if(r.error)toast(r.error,true);else toast('订阅已刷新');await load()}finally{$('refreshBtn').disabled=false}});
     $('addProviderBtn').addEventListener('click',()=>{markSettingsDirty();adminConfig.providers.push({id:'new-provider',name:'新机场',category:'默认',subscriptionUrl:'',subscriptionFile:''});renderProviders(adminConfig.providers,[])});
     $('addAgentBtn').addEventListener('click',()=>{markSettingsDirty();const n=adminConfig.agents.length+1;adminConfig.agents.push({id:'agent-'+n,name:'新 Agent '+n,probeSource:'城市运营商',carrier:'unknown'});renderAgentEditor(adminConfig.agents,[]);loadInstallCommand().catch(console.error)});
     $('refreshDiscoveredAgentsBtn').addEventListener('click',()=>refreshDiscoveredAgents().catch(e=>toast(e.message,true)));

@@ -432,6 +432,9 @@ func dedupeNodes(nodes []model.ProxyNode) []model.ProxyNode {
 		if node.ID == "" || node.Server == "" || node.Port <= 0 {
 			continue
 		}
+		if isInfoNode(node) {
+			continue
+		}
 		if _, ok := seen[node.ID]; ok {
 			continue
 		}
@@ -439,6 +442,37 @@ func dedupeNodes(nodes []model.ProxyNode) []model.ProxyNode {
 		out = append(out, node)
 	}
 	return out
+}
+
+func isInfoNode(node model.ProxyNode) bool {
+	name := strings.ToLower(strings.TrimSpace(node.Name))
+	server := strings.ToLower(strings.TrimSpace(node.Server))
+	if server == "127.0.0.1" || server == "localhost" || server == "0.0.0.0" || server == "::1" {
+		return true
+	}
+	if ip := net.ParseIP(server); ip != nil && (ip.IsLoopback() || ip.IsUnspecified()) {
+		return true
+	}
+	infoPatterns := []string{
+		"剩余", "流量", "套餐", "到期", "过期", "有效", "长期", "官网", "网站", "地址", "订阅", "更新", "重置", "用户", "账户", "账号", "公告", "通知", "频道", "客服",
+		"traffic", "expire", "expiry", "expired", "remaining", "reset", "renew", "subscribe", "subscription", "official", "website", "notice", "user", "account", "telegram",
+	}
+	for _, pattern := range infoPatterns {
+		if strings.Contains(name, pattern) {
+			return true
+		}
+	}
+	infoRegexes := []*regexp.Regexp{
+		regexp.MustCompile(`(?i)^\s*(expire|expiry|traffic|reset|renew|notice|info)\b`),
+		regexp.MustCompile(`(?i)\b\d+(\.\d+)?\s*(gb|tb|mb)\b`),
+		regexp.MustCompile(`(?i)\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b`),
+	}
+	for _, pattern := range infoRegexes {
+		if pattern.MatchString(name) {
+			return true
+		}
+	}
+	return false
 }
 
 func tryBase64(value string) ([]byte, bool) {
