@@ -628,22 +628,32 @@
       const pad=Math.max((end-start)*0.06,30000);
       return{start:start-pad,end:end+pad};
     }
-    function curveDisplayPoints(points,compact){
-      const maxPoints=compact?16:28;
-      if(points.length<=maxPoints)return points;
-      const step=Math.ceil(points.length/maxPoints);
-      return points.filter((_,index)=>index%step===0||index===points.length-1);
+    function curvePlotRecords(records,compact){
+      const maxPoints=compact?18:36;
+      if(records.length<=maxPoints)return records;
+      const out=[];
+      for(let i=0;i<maxPoints;i++){
+        const startIndex=Math.floor(i*records.length/maxPoints), endIndex=Math.max(startIndex+1,Math.floor((i+1)*records.length/maxPoints));
+        const bucket=records.slice(startIndex,endIndex);
+        if(i===0){out.push(records[0]);continue}
+        if(i===maxPoints-1){out.push(records[records.length-1]);continue}
+        const time=bucket.reduce((sum,item)=>sum+item.time,0)/bucket.length;
+        const value=bucket.reduce((sum,item)=>sum+item.value,0)/bucket.length;
+        out.push({time,value});
+      }
+      return out;
     }
     function curvePath(points){
       if(!points.length)return'';
       if(points.length===1)return'M '+points[0][0].toFixed(1)+' '+points[0][1].toFixed(1);
       let d='M '+points[0][0].toFixed(1)+' '+points[0][1].toFixed(1);
-      for(let i=1;i<points.length;i++){
-        const prev=points[i-1], curr=points[i], midX=(prev[0]+curr[0])/2, midY=(prev[1]+curr[1])/2;
-        d+=' Q '+prev[0].toFixed(1)+' '+prev[1].toFixed(1)+' '+midX.toFixed(1)+' '+midY.toFixed(1);
+      for(let i=0;i<points.length-1;i++){
+        const p0=points[i-1]||points[i], p1=points[i], p2=points[i+1], p3=points[i+2]||p2;
+        const cp1x=p1[0]+(p2[0]-p0[0])/6, cp1y=p1[1]+(p2[1]-p0[1])/6;
+        const cp2x=p2[0]-(p3[0]-p1[0])/6, cp2y=p2[1]-(p3[1]-p1[1])/6;
+        d+=' C '+cp1x.toFixed(1)+' '+cp1y.toFixed(1)+' '+cp2x.toFixed(1)+' '+cp2y.toFixed(1)+' '+p2[0].toFixed(1)+' '+p2[1].toFixed(1);
       }
-      const last=points[points.length-1];
-      return d+' L '+last[0].toFixed(1)+' '+last[1].toFixed(1);
+      return d;
     }
     function renderCurveChart(samples,carrierEntries){
       const metric=curveMetricInfo(), chartEl=$('curveChart'), chartWidth=Math.round(chartEl.clientWidth||920), compact=chartWidth<560;
@@ -672,10 +682,11 @@
       let colorIndex=0;
       for(const [key,list] of groups.entries()){
         const color=curvePalette[colorIndex++%curvePalette.length];
-        const points=list.map(sample=>({sample,value:curveValue(sample)})).filter(p=>p.value!==null&&Number.isFinite(p.value)).sort((a,b)=>new Date(a.sample.time)-new Date(b.sample.time)).map(p=>[xOf(p.sample.time),yOf(p.value),p.value]);
+        const records=curvePlotRecords(list.map(sample=>({time:new Date(sample.time).getTime(),value:curveValue(sample)})).filter(p=>Number.isFinite(p.time)&&p.value!==null&&Number.isFinite(p.value)).sort((a,b)=>a.time-b.time),compact);
+        const points=records.map(p=>[xOf(p.time),yOf(p.value),p.value]);
         if(points.length>1)svg+='<path class="curve-line" stroke="'+color+'" d="'+curvePath(points)+'"></path>';
-        curveDisplayPoints(points,compact).forEach(p=>{svg+='<circle class="curve-point" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+pointRadius+'" fill="'+color+'"></circle>'});
-        if(points.length===1)svg+='<circle class="curve-point" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="'+singlePointRadius+'" fill="'+color+'"></circle>';
+        if(points.length>1)points.forEach(p=>{svg+='<circle class="curve-point" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+pointRadius+'" fill="'+color+'"></circle>'});
+        else if(points.length===1)svg+='<circle class="curve-point" cx="'+points[0][0].toFixed(1)+'" cy="'+points[0][1].toFixed(1)+'" r="'+singlePointRadius+'" fill="'+color+'"></circle>';
       }
       samples.filter(sample=>!sample.success).slice(-180).forEach(sample=>{const x=xOf(sample.time);svg+='<rect class="curve-timeout" x="'+(x-timeoutWidth/2).toFixed(1)+'" y="'+(height-bottom+8)+'" width="'+timeoutWidth+'" height="'+timeoutHeight+'" rx="1.4"></rect>'});
       svg+='</svg>';
