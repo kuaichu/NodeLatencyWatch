@@ -93,9 +93,11 @@
     .country-chip:hover{transform:translateY(-1px);color:#d7e5ec;border-color:rgba(132,162,184,.3)}
     .country-chip.active{border-color:rgba(105,183,255,.42);background:rgba(105,183,255,.12);color:#e7f5ff}
     .matrix-tools{display:flex;align-items:end;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.03)}
-    .tool-field{display:grid;gap:5px;min-width:118px}.tool-field.compact{min-width:86px}.tool-field.wide{min-width:142px}
-    .tool-field label{color:#6f8391;font-size:11px;font-weight:780}.tool-field select,.tool-field input{height:34px;border:1px solid rgba(132,162,184,.16);border-radius:10px;background:#071018;color:#dceaf0;padding:0 10px;font:12px var(--mono)}
-    .tool-field input::placeholder{color:#526672}.tool-field select:focus,.tool-field input:focus{outline:none;border-color:rgba(105,183,255,.45);box-shadow:0 0 0 3px rgba(105,183,255,.1)}
+    .tool-field{position:relative;display:grid;gap:5px;min-width:118px}.tool-field.compact{min-width:86px}.tool-field.wide{min-width:142px}
+    .tool-field label{color:#6f8391;font-size:11px;font-weight:780}.tool-field select,.tool-field input,.tool-select-trigger{height:34px;border:1px solid rgba(132,162,184,.16);border-radius:10px;background:#071018;color:#dceaf0;padding:0 10px;font:12px var(--mono)}
+    .tool-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;cursor:pointer;text-align:left}.tool-select-trigger:after{content:"";width:8px;height:8px;border-right:2px solid #7f93a0;border-bottom:2px solid #7f93a0;transform:rotate(45deg) translateY(-2px);transition:.16s ease}.tool-select.open .tool-select-trigger:after{transform:rotate(225deg) translateY(-1px)}.tool-select-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tool-select-menu{position:absolute;z-index:8;left:0;right:0;top:calc(100% + 7px);display:none;overflow:hidden;border:1px solid rgba(105,183,255,.25);border-radius:14px;background:linear-gradient(145deg,#111c27,#0a131c);box-shadow:0 18px 48px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04)}.tool-select.open .tool-select-menu{display:grid}.tool-select-option{height:38px;padding:0 12px;border-bottom:1px solid rgba(132,162,184,.1);background:transparent;color:#c7d8e2;text-align:left;font-size:12px;font-weight:820;cursor:pointer}.tool-select-option:last-child{border-bottom:0}.tool-select-option:hover,.tool-select-option.active{background:rgba(32,214,162,.12);color:#e8fff7}
+    .tool-field input::placeholder{color:#526672}.tool-field select:focus,.tool-field input:focus,.tool-select-trigger:focus{outline:none;border-color:rgba(105,183,255,.45);box-shadow:0 0 0 3px rgba(105,183,255,.1)}
     .tool-btn{height:34px;padding:0 12px;border:1px solid rgba(132,162,184,.18);border-radius:10px;background:rgba(255,255,255,.045);font-size:12px;font-weight:850;cursor:pointer}
     .tool-btn.primary{border-color:rgba(32,214,162,.32);background:rgba(32,214,162,.12);color:#dffcf2}.tool-btn:hover{border-color:rgba(132,162,184,.34)}
     .table-wrap{overflow:auto;border:1px solid rgba(132,162,184,.14);border-radius:18px;background:rgba(255,255,255,.035)}
@@ -167,7 +169,7 @@
       .metric-strip{gap:8px}.mini-card{border-radius:13px;padding:10px}.mini-card .label,.mini-card .hint{font-size:11px}.mini-card .value{font-size:18px}
       .status-row{grid-template-columns:72px minmax(0,1fr);padding:10px 12px;font-size:12px}.section-title{align-items:flex-start;flex-direction:column;gap:5px;margin-bottom:12px}.section-title p{line-height:1.45}
       .country-rail{flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -14px 12px;padding:0 14px 4px;-webkit-overflow-scrolling:touch}.country-chip{flex:0 0 auto;min-height:34px;padding:0 11px}
-      .matrix-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;margin-bottom:12px;padding:10px;border-radius:14px}.tool-field,.tool-field.compact,.tool-field.wide{min-width:0;width:auto}.tool-field label{font-size:10px}.tool-field select,.tool-field input,.tool-btn{width:100%;height:38px;font-size:12px}
+      .matrix-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;margin-bottom:12px;padding:10px;border-radius:14px}.tool-field,.tool-field.compact,.tool-field.wide{min-width:0;width:auto}.tool-field label{font-size:10px}.tool-field select,.tool-field input,.tool-btn,.tool-select-trigger{width:100%;height:38px;font-size:12px}.tool-select-menu{top:calc(100% + 6px)}.tool-select-option{height:40px}
       .table-wrap{overflow:visible;border:0;border-radius:0;background:transparent}table,thead,tbody,tr,td{display:block;width:100%}thead{display:none}tbody{display:grid;gap:10px}tr{display:grid;gap:8px;padding:12px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.035);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}tr:hover td{background:transparent}td{padding:0;border:0;white-space:normal;overflow:visible;text-overflow:clip;font-size:13px}
       td.node-cell{min-width:0}.node-title{align-items:flex-start;gap:8px}.node{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}.meta{overflow-wrap:anywhere;font-size:11px}.node-curve{height:28px;padding:0 11px}
       td.info-cell{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.035);color:#d7e5ec}td.info-cell:before{content:attr(data-label);color:#728692;font-size:11px;font-weight:800}
@@ -175,7 +177,7 @@
       .curve-card{width:calc(100vw - 16px)}.curve-head{gap:10px}.curve-toolbar{gap:8px}.curve-chip{flex:1;justify-content:center}.curve-select{width:100%}.curve-summary{gap:8px}.curve-chart{height:260px}.toast{right:8px;left:8px;bottom:10px;text-align:center}
     }
     @media(max-width:430px){
-      .matrix-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.tool-field.wide{grid-column:1/-1}.matrix-tools .tool-btn.primary{grid-column:1/2}.metric-cell{grid-template-columns:repeat(2,minmax(0,1fr))}.modal{padding:8px}.modal-card{width:calc(100vw - 16px);max-height:calc(100vh - 16px);padding:14px;border-radius:16px}.modal-head,.curve-head{align-items:stretch;flex-direction:column}.settings-card{padding:12px}.inline-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+      .matrix-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.tool-field.wide,.tool-btn.sort-dir{grid-column:1/-1}.matrix-tools .tool-btn.primary{grid-column:1/2}.metric-cell{grid-template-columns:repeat(2,minmax(0,1fr))}.modal{padding:8px}.modal-card{width:calc(100vw - 16px);max-height:calc(100vh - 16px);padding:14px;border-radius:16px}.modal-head,.curve-head{align-items:stretch;flex-direction:column}.settings-card{padding:12px}.inline-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
     }
   </style>
 </head>
@@ -489,6 +491,20 @@
     function activeMatrixFilters(){
       return Object.entries(matrixFilters).filter(([,value])=>filterNumber(value)!==null).map(([key,value])=>sortMetricLabel(key)+'≤'+filterNumber(value)+(key==='loss'?'%':'ms'));
     }
+    function toolSelectHTML(id,label,value,options,wide=true){
+      const current=options.find(item=>item[0]===value)||options[0]||['','-'];
+      return '<div class="tool-field tool-select '+(wide?'wide':'')+'" data-tool-select="'+escapeHTML(id)+'"><label>'+escapeHTML(label)+'</label><button type="button" class="tool-select-trigger" id="'+escapeHTML(id)+'" aria-haspopup="listbox" aria-expanded="false"><span class="tool-select-value">'+escapeHTML(current[1])+'</span></button><div class="tool-select-menu" role="listbox">'+options.map(item=>'<button type="button" class="tool-select-option '+(item[0]===value?'active':'')+'" data-value="'+escapeHTML(item[0])+'" role="option" aria-selected="'+(item[0]===value?'true':'false')+'">'+escapeHTML(item[1])+'</button>').join('')+'</div></div>';
+    }
+    function closeToolSelects(except){
+      document.querySelectorAll('.tool-select.open').forEach(el=>{if(el!==except){el.classList.remove('open');const trigger=el.querySelector('.tool-select-trigger');if(trigger)trigger.setAttribute('aria-expanded','false')}});
+    }
+    function bindToolSelect(id,onChange){
+      const root=document.querySelector('[data-tool-select="'+id+'"]');
+      if(!root)return;
+      const trigger=root.querySelector('.tool-select-trigger');
+      trigger.addEventListener('click',e=>{e.stopPropagation();const open=!root.classList.contains('open');closeToolSelects(root);root.classList.toggle('open',open);trigger.setAttribute('aria-expanded',open?'true':'false')});
+      root.querySelectorAll('.tool-select-option').forEach(option=>option.addEventListener('click',e=>{e.stopPropagation();onChange(option.dataset.value||'')}));
+    }
     function rowPassesMatrixFilters(row){
       const sample=sampleForRow(row);
       return ['rtt','http','jitter','loss'].every(key=>{const limit=filterNumber(matrixFilters[key]);return limit===null||sampleValue(sample,key)<=limit})
@@ -498,17 +514,16 @@
     }
     function renderMatrixTools(){
       if(matrixMetricCarrier!=='best'&&!matrixCarriers.some(c=>c[0]===matrixMetricCarrier))matrixMetricCarrier='best';
-      const sortOptions=sortMetrics.map(([value,label])=>'<option value="'+value+'" '+(matrixSort===value?'selected':'')+'>'+label+'</option>').join('');
-      const carrierOptionsHTML='<option value="best" '+(matrixMetricCarrier==='best'?'selected':'')+'>最佳线路</option>'+matrixCarriers.map(c=>'<option value="'+escapeHTML(c[0])+'" '+(matrixMetricCarrier===c[0]?'selected':'')+'>'+escapeHTML(c[1])+'</option>').join('');
+      const carrierOptions=[['best','最佳线路'],...matrixCarriers];
       const input=(key,label,placeholder)=>'<div class="tool-field compact"><label>'+label+'上限</label><input id="matrixFilter_'+key+'" inputmode="decimal" value="'+escapeHTML(matrixFilters[key])+'" placeholder="'+placeholder+'"></div>';
       $('matrixTools').innerHTML=
-        '<div class="tool-field wide"><label>排序指标</label><select id="matrixSortSelect">'+sortOptions+'</select></div>'+
-        '<div class="tool-field wide"><label>排序线路</label><select id="matrixCarrierSelect">'+carrierOptionsHTML+'</select></div>'+
-        '<button type="button" class="tool-btn" id="matrixSortDir">'+(matrixSortDir==='asc'?'低到高':'高到低')+'</button>'+
+        toolSelectHTML('matrixSortSelect','排序指标',matrixSort,sortMetrics)+
+        toolSelectHTML('matrixCarrierSelect','排序线路',matrixMetricCarrier,carrierOptions)+
+        '<button type="button" class="tool-btn sort-dir" id="matrixSortDir">'+(matrixSortDir==='asc'?'低到高':'高到低')+'</button>'+
         input('rtt','RTT','ms')+input('http','HTTP','ms')+input('jitter','抖动','ms')+input('loss','丢包','%')+
         '<button type="button" class="tool-btn primary" id="matrixFilterApply">应用</button><button type="button" class="tool-btn" id="matrixFilterReset">清空</button>';
-      $('matrixSortSelect').addEventListener('change',e=>{collectMatrixFilters();matrixSort=e.target.value;renderMatrix(lastOverview)});
-      $('matrixCarrierSelect').addEventListener('change',e=>{collectMatrixFilters();matrixMetricCarrier=e.target.value;renderMatrix(lastOverview)});
+      bindToolSelect('matrixSortSelect',value=>{collectMatrixFilters();matrixSort=value;closeToolSelects();renderMatrix(lastOverview)});
+      bindToolSelect('matrixCarrierSelect',value=>{collectMatrixFilters();matrixMetricCarrier=value;closeToolSelects();renderMatrix(lastOverview)});
       $('matrixSortDir').addEventListener('click',()=>{collectMatrixFilters();matrixSortDir=matrixSortDir==='asc'?'desc':'asc';renderMatrix(lastOverview)});
       $('matrixFilterApply').addEventListener('click',()=>{collectMatrixFilters();renderMatrix(lastOverview)});
       $('matrixFilterReset').addEventListener('click',()=>{Object.keys(matrixFilters).forEach(key=>matrixFilters[key]='');renderMatrix(lastOverview)});
@@ -843,7 +858,7 @@
       $('installHint').textContent=res.tokenSet?'脚本会优先从当前主控下载 agent 二进制，失败后回落到 GitHub Release。':'主控还没有配置 Token，请先保存 Token 后再复制命令。';
     }
     document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchSettingsTab(btn.dataset.tab)));
-    $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('curveModal').classList.contains('open'))closeCurve();else if(e.key==='Escape'&&$('settingsModal').classList.contains('open'))closeSettings()});
+    $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('click',()=>closeToolSelects());document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeToolSelects();if($('curveModal').classList.contains('open'))closeCurve();else if($('settingsModal').classList.contains('open'))closeSettings()}});
     $('curveClose').addEventListener('click',closeCurve);$('curveModal').addEventListener('click',e=>{if(e.target===$('curveModal'))closeCurve()});
     document.querySelectorAll('[data-curve-metric]').forEach(btn=>btn.addEventListener('click',()=>{curveState.metric=btn.dataset.curveMetric;renderCurve()}));
     $('curveHours').addEventListener('change',()=>{curveState.hours=Number($('curveHours').value)||24;loadCurveSamples().catch(e=>toast(e.message,true))});
