@@ -87,12 +87,17 @@
     .status-row{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;padding:12px 14px;border-bottom:1px solid rgba(132,162,184,.12);font-size:13px}
     .status-row:last-child{border-bottom:0}.status-row span{color:var(--muted)}.status-row strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .section{padding:22px}
+    .country-rail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:-2px 0 14px}
+    .country-chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.035);color:#94a8b6;font-size:12px;font-weight:800;cursor:pointer;transition:.18s ease}
+    .country-count{margin-left:6px;color:#6f8593;font-family:var(--mono);font-size:11px}.country-chip.active .country-count{color:#b8dcf5}
+    .country-chip:hover{transform:translateY(-1px);color:#d7e5ec;border-color:rgba(132,162,184,.3)}
+    .country-chip.active{border-color:rgba(105,183,255,.42);background:rgba(105,183,255,.12);color:#e7f5ff}
     .table-wrap{overflow:auto;border:1px solid rgba(132,162,184,.14);border-radius:18px;background:rgba(255,255,255,.035)}
     table{width:100%;border-collapse:collapse;table-layout:fixed}
     th,td{padding:12px 13px;border-bottom:1px solid rgba(132,162,184,.12);text-align:left;vertical-align:middle;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     th{color:var(--muted);font-size:12px;font-weight:760;background:rgba(4,12,18,.26)}
     tr:last-child td{border-bottom:0}tr:hover td{background:rgba(255,255,255,.025)}
-    .node{font-weight:850}.meta{display:block;margin-top:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
+    .node-title{display:flex;align-items:center;gap:8px;min-width:0}.flag{display:inline-grid;place-items:center;width:22px;height:16px;flex:0 0 22px;border-radius:4px;overflow:hidden;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.14);color:#d7e5ec;font-family:var(--mono);font-size:9px;font-weight:900;line-height:1}.flag-img,.flag-code{grid-area:1/1}.flag-img{width:100%;height:100%;object-fit:cover}.country-chip .flag{width:20px;height:15px;flex-basis:20px}.node{font-weight:850;min-width:0;overflow:hidden;text-overflow:ellipsis}.meta{display:block;margin-top:4px;color:var(--muted);font-size:12px;font-family:var(--mono)}
     .latency,.badge{display:inline-flex;align-items:center;min-width:64px;height:24px;padding:0 8px;border-radius:999px;background:rgba(32,214,162,.12);color:#9ff5d1;font-family:var(--mono);font-size:12px}
     .latency.warn,.badge.warn{background:rgba(244,201,93,.13);color:#f4d98f}.latency.bad,.badge.bad{background:rgba(255,107,107,.13);color:#ffc7c7}.badge.neutral{background:rgba(255,255,255,.06);color:#b8c7d0}
     .metric-cell{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;min-width:158px;white-space:normal}
@@ -188,6 +193,7 @@
           <p id="matrixHint">按机场分类过滤，展示三网最新 204 连通性。</p>
         </div>
       </div>
+      <div class="country-rail" id="countryRail"></div>
       <div id="matrix"></div>
     </section>
   </div>
@@ -298,8 +304,34 @@
 
   <script>
     const carriers=[["telecom","电信"],["unicom","联通"],["mobile","移动"],["unknown","未知"]];
+    const countries=[
+      {code:'hk',flag:'🇭🇰',label:'香港',patterns:[/hong\s*kong/i,/hongkong/i,/香港/i,/(^|[\s._-])hk\d*($|[\s._-])/i,/(^|[\s._-])hkg\d*($|[\s._-])/i]},
+      {code:'tw',flag:'🇹🇼',label:'台湾',patterns:[/taiwan/i,/台湾/i,/臺灣/i,/(^|[\s._-])tw\d*($|[\s._-])/i]},
+      {code:'jp',flag:'🇯🇵',label:'日本',patterns:[/japan/i,/tokyo/i,/osaka/i,/日本/i,/东京/i,/東京/i,/大阪/i,/(^|[\s._-])jp\d*($|[\s._-])/i]},
+      {code:'sg',flag:'🇸🇬',label:'新加坡',patterns:[/singapore/i,/新加坡/i,/(^|[\s._-])sg\d*($|[\s._-])/i]},
+      {code:'us',flag:'🇺🇸',label:'美国',patterns:[/united\s*states/i,/\busa\b/i,/america/i,/美国/i,/美國/i,/(^|[\s._-])us\d*($|[\s._-])/i]},
+      {code:'kr',flag:'🇰🇷',label:'韩国',patterns:[/south\s*korea/i,/korea/i,/seoul/i,/韩国/i,/韓國/i,/首尔/i,/首爾/i,/(^|[\s._-])kr\d*($|[\s._-])/i]},
+      {code:'uk',flag:'🇬🇧',flagCode:'gb',label:'英国',patterns:[/united\s*kingdom/i,/london/i,/英国/i,/英國/i,/(^|[\s._-])(uk|gb)\d*($|[\s._-])/i]},
+      {code:'de',flag:'🇩🇪',label:'德国',patterns:[/germany/i,/frankfurt/i,/德国/i,/德國/i,/(^|[\s._-])de\d*($|[\s._-])/i]},
+      {code:'fr',flag:'🇫🇷',label:'法国',patterns:[/france/i,/paris/i,/法国/i,/法國/i,/(^|[\s._-])fr\d*($|[\s._-])/i]},
+      {code:'nl',flag:'🇳🇱',label:'荷兰',patterns:[/netherlands/i,/amsterdam/i,/荷兰/i,/荷蘭/i,/(^|[\s._-])nl\d*($|[\s._-])/i]},
+      {code:'ca',flag:'🇨🇦',label:'加拿大',patterns:[/canada/i,/toronto/i,/加拿大/i,/(^|[\s._-])ca\d*($|[\s._-])/i]},
+      {code:'au',flag:'🇦🇺',label:'澳大利亚',patterns:[/australia/i,/sydney/i,/澳大利亚/i,/澳洲/i,/(^|[\s._-])au\d*($|[\s._-])/i]},
+      {code:'ru',flag:'🇷🇺',label:'俄罗斯',patterns:[/russia/i,/moscow/i,/俄罗斯/i,/俄羅斯/i,/(^|[\s._-])ru\d*($|[\s._-])/i]},
+      {code:'my',flag:'🇲🇾',label:'马来西亚',patterns:[/malaysia/i,/马来西亚/i,/馬來西亞/i,/(^|[\s._-])my\d*($|[\s._-])/i]},
+      {code:'th',flag:'🇹🇭',label:'泰国',patterns:[/thailand/i,/bangkok/i,/泰国/i,/泰國/i,/(^|[\s._-])th\d*($|[\s._-])/i]},
+      {code:'vn',flag:'🇻🇳',label:'越南',patterns:[/vietnam/i,/越南/i,/(^|[\s._-])vn\d*($|[\s._-])/i]},
+      {code:'in',flag:'🇮🇳',label:'印度',patterns:[/india/i,/mumbai/i,/印度/i,/(^|[\s._-])in\d*($|[\s._-])/i]},
+      {code:'br',flag:'🇧🇷',label:'巴西',patterns:[/brazil/i,/巴西/i,/(^|[\s._-])br\d*($|[\s._-])/i]},
+      {code:'mo',flag:'🇲🇴',label:'澳门',patterns:[/macau/i,/macao/i,/澳门/i,/澳門/i,/(^|[\s._-])mo\d*($|[\s._-])/i]},
+      {code:'id',flag:'🇮🇩',label:'印尼',patterns:[/indonesia/i,/jakarta/i,/印尼/i,/印度尼西亚/i,/印度尼西亞/i,/(^|[\s._-])id\d*($|[\s._-])/i]},
+      {code:'ph',flag:'🇵🇭',label:'菲律宾',patterns:[/philippines/i,/manila/i,/菲律宾/i,/菲律賓/i,/(^|[\s._-])ph\d*($|[\s._-])/i]},
+      {code:'tr',flag:'🇹🇷',label:'土耳其',patterns:[/turkey/i,/istanbul/i,/土耳其/i,/(^|[\s._-])tr\d*($|[\s._-])/i]},
+      {code:'ae',flag:'🇦🇪',label:'阿联酋',patterns:[/united\s*arab\s*emirates/i,/dubai/i,/阿联酋/i,/阿聯酋/i,/迪拜/i,/(^|[\s._-])uae\d*($|[\s._-])/i,/(^|[\s._-])ae\d*($|[\s._-])/i]}
+    ];
+    const unknownCountry={code:'unknown',flag:'▫',flagCode:'',short:'--',label:'未知'};
     const $=id=>document.getElementById(id);
-    let adminConfig=null, activeTab='providers', selectedCategory='all', lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
+    let adminConfig=null, activeTab='providers', selectedCategory='all', selectedCountry='all', lastOverview=[], matrixCarriers=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
     async function apiJSON(url,options){
@@ -334,6 +366,26 @@
     function carrierOptions(selected){return carriers.map(([v,l])=>'<option value="'+v+'" '+(v===selected?'selected':'')+'>'+l+'</option>').join('')}
     function carrierLabel(value){const found=carriers.find(c=>c[0]===value);return found?found[1]:value}
     function carriersForAgents(agents){const present=new Set((agents||[]).map(a=>a.carrier||'unknown'));return carriers.filter(c=>present.has(c[0]))}
+    function countryText(row){const n=row&&row.node?row.node:{};return [n.name,n.server,n.provider,n.category].filter(Boolean).join(' ').replace(/[_-]+/g,' ')}
+    function countryForRow(row){const text=countryText(row);return countries.find(c=>c.patterns.some(pattern=>pattern.test(text)))||unknownCountry}
+    function flagHTML(country){
+      const fallback=escapeHTML((country.short||country.code||'').toUpperCase());
+      const flagCode=String(country.flagCode===undefined?country.code:country.flagCode||'').toLowerCase();
+      if(!flagCode)return'<span class="flag"><span class="flag-code">'+fallback+'</span></span>';
+      const src='https://flagcdn.com/24x18/'+escapeHTML(flagCode)+'.png';
+      const srcset='https://flagcdn.com/48x36/'+escapeHTML(flagCode)+'.png 2x';
+      return'<span class="flag"><span class="flag-code">'+fallback+'</span><img class="flag-img" src="'+src+'" srcset="'+srcset+'" alt="'+escapeHTML(country.label)+'" loading="lazy" decoding="async" onerror="this.remove()"></span>';
+    }
+    function countriesForRows(rows){
+      const byCode=new Map();
+      (rows||[]).forEach(row=>{const country=countryForRow(row);const item=byCode.get(country.code);if(item)item.count+=1;else byCode.set(country.code,{...country,count:1})});
+      return Array.from(byCode.values()).sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans-CN'))
+    }
+    function renderCountryRail(list,total){
+      const chips='<button type="button" class="country-chip '+(selectedCountry==='all'?'active':'')+'" data-country="all">全部地区<span class="country-count">'+Number(total||0)+'</span></button>'+list.map(country=>'<button type="button" class="country-chip '+(selectedCountry===country.code?'active':'')+'" data-country="'+escapeHTML(country.code)+'">'+flagHTML(country)+'<span class="country-name">'+escapeHTML(country.label)+'</span><span class="country-count">'+Number(country.count||0)+'</span></button>').join('');
+      $('countryRail').innerHTML=chips;
+      document.querySelectorAll('#countryRail [data-country]').forEach(btn=>btn.addEventListener('click',()=>{selectedCountry=btn.dataset.country;renderMatrix(lastOverview)}));
+    }
     function statusBadge(status){if(status==='online')return'<span class="badge">在线</span>';if(status==='stale')return'<span class="badge warn">过期</span>';return'<span class="badge bad">离线</span>'}
     function statusLabel(status){return status==='online'?'在线':status==='stale'?'过期':'离线'}
     async function load(){
@@ -381,12 +433,17 @@
     function agentHasReported(agent){return Boolean(agent&&agent.lastSeen&&!String(agent.lastSeen).startsWith('0001'))}
     function agentVisible(agent){return Boolean(agent&&agent.configured&&agentHasReported(agent))}
     function renderMatrix(rows){
-      const filtered=selectedCategory==='all'?rows:rows.filter(r=>(r.node.category||'默认')===selectedCategory);
+      const categoryRows=selectedCategory==='all'?rows:rows.filter(r=>(r.node.category||'默认')===selectedCategory);
+      const countryList=countriesForRows(categoryRows);
+      if(selectedCountry!=='all'&&!countryList.some(country=>country.code===selectedCountry))selectedCountry='all';
+      renderCountryRail(countryList,categoryRows.length);
+      const filtered=selectedCountry==='all'?categoryRows:categoryRows.filter(row=>countryForRow(row).code===selectedCountry);
+      const countryLabel=selectedCountry==='all'?'全部地区':(countryList.find(country=>country.code===selectedCountry)?.label||'未知');
       const carrierHint=matrixCarriers.length?(' · '+matrixCarriers.map(c=>c[1]).join(' / ')):' · 未配置 Agent';
-      $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+filtered.length+' 个节点'+carrierHint;
+      $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+countryLabel+' · '+filtered.length+' 个节点'+carrierHint;
       if(!filtered.length){$('matrix').innerHTML='<div class="empty">当前分类没有节点。请在管理设置里检查机场订阅。</div>';return}
       const metricHead=matrixCarriers.map(c=>'<th>'+escapeHTML(c[1])+'</th>').join('');
-      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const metricCells=matrixCarriers.map(c=>'<td class="metric-col">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td><span class="node">'+escapeHTML(row.node.name)+'</span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
+      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
     }
     function renderProviders(providers,statuses){
       const counts={};(statuses||[]).forEach(s=>counts[s.id]=s.nodeCount||0);
