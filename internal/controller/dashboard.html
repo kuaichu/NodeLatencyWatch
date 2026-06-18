@@ -153,6 +153,30 @@
       .matrix-tools{align-items:stretch}.tool-field,.tool-field.compact,.tool-field.wide{min-width:calc(50% - 5px);flex:1}.tool-btn{flex:1}
       .curve-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.curve-chart{height:300px}
     }
+    @media(max-width:720px){
+      body{overflow-x:hidden}
+      body:before{background-size:36px 36px}
+      .shell{width:100%;padding:10px 8px 24px}
+      .topbar{gap:10px;margin-bottom:12px}
+      .brand{gap:10px}.brand-mark{width:34px;height:34px;border-radius:12px;font-size:12px}.eyebrow{font-size:10px}h1{font-size:16px;line-height:1.25}
+      .top-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%;justify-content:stretch}
+      .top-actions .pill{grid-column:1/-1;justify-content:center;min-height:34px;font-size:12px}.top-actions .btn{min-height:36px;padding:0 10px;font-size:12px}.top-actions .btn-primary{grid-column:1/-1}
+      .profile-rail{flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -8px 12px;padding:0 8px 4px;-webkit-overflow-scrolling:touch}.profile-rail::-webkit-scrollbar,.country-rail::-webkit-scrollbar{display:none}.profile-chip{flex:0 0 auto;min-height:32px}
+      .agent-section{margin-bottom:12px}.agent-card{border-radius:16px;padding:12px}.agent-meta{gap:7px}
+      .hero{gap:10px;margin-bottom:10px}.panel{border-radius:18px}.hero-main,.side-panel,.section{padding:14px}.hero-title{margin-bottom:14px}.domain{font-size:24px;line-height:1.15}.subline{gap:6px}.sub-chip{padding:6px 9px;font-size:12px}
+      .metric-strip{gap:8px}.mini-card{border-radius:13px;padding:10px}.mini-card .label,.mini-card .hint{font-size:11px}.mini-card .value{font-size:18px}
+      .status-row{grid-template-columns:72px minmax(0,1fr);padding:10px 12px;font-size:12px}.section-title{align-items:flex-start;flex-direction:column;gap:5px;margin-bottom:12px}.section-title p{line-height:1.45}
+      .country-rail{flex-wrap:nowrap;overflow-x:auto;gap:8px;margin:0 -14px 12px;padding:0 14px 4px;-webkit-overflow-scrolling:touch}.country-chip{flex:0 0 auto;min-height:34px;padding:0 11px}
+      .matrix-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;gap:8px;margin-bottom:12px;padding:10px;border-radius:14px}.tool-field,.tool-field.compact,.tool-field.wide{min-width:0;width:auto}.tool-field label{font-size:10px}.tool-field select,.tool-field input,.tool-btn{width:100%;height:38px;font-size:12px}
+      .table-wrap{overflow:visible;border:0;border-radius:0;background:transparent}table,thead,tbody,tr,td{display:block;width:100%}thead{display:none}tbody{display:grid;gap:10px}tr{display:grid;gap:8px;padding:12px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.035);box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}tr:hover td{background:transparent}td{padding:0;border:0;white-space:normal;overflow:visible;text-overflow:clip;font-size:13px}
+      td.node-cell{min-width:0}.node-title{align-items:flex-start;gap:8px}.node{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35}.meta{overflow-wrap:anywhere;font-size:11px}.node-curve{height:28px;padding:0 11px}
+      td.info-cell{display:grid;grid-template-columns:48px minmax(0,1fr);gap:8px;align-items:center;padding:7px 9px;border-radius:10px;background:rgba(255,255,255,.035);color:#d7e5ec}td.info-cell:before{content:attr(data-label);color:#728692;font-size:11px;font-weight:800}
+      td.metric-col{display:block;margin-top:2px}td.metric-col:before{content:attr(data-label);display:block;margin:0 0 6px;color:#8fa4b2;font-size:11px;font-weight:850}.metric-cell{min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.metric-kv{min-width:0;padding:6px 7px}.metric-kv span{font-size:10px}.metric-kv strong{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .curve-card{width:calc(100vw - 16px)}.curve-head{gap:10px}.curve-toolbar{gap:8px}.curve-chip{flex:1;justify-content:center}.curve-select{width:100%}.curve-summary{gap:8px}.curve-chart{height:260px}.toast{right:8px;left:8px;bottom:10px;text-align:center}
+    }
+    @media(max-width:430px){
+      .matrix-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.tool-field.wide{grid-column:1/-1}.matrix-tools .tool-btn.primary{grid-column:1/2}.metric-cell{grid-template-columns:repeat(2,minmax(0,1fr))}.modal{padding:8px}.modal-card{width:calc(100vw - 16px);max-height:calc(100vh - 16px);padding:14px;border-radius:16px}.modal-head,.curve-head{align-items:stretch;flex-direction:column}.settings-card{padding:12px}.inline-actions{display:grid;grid-template-columns:1fr 1fr;width:100%}
+    }
   </style>
 </head>
 <body>
@@ -714,7 +738,7 @@
       $('matrixHint').textContent=(selectedCategory==='all'?'全部分类':selectedCategory)+' · '+countryLabel+' · '+countLabel+' · '+carrierLabelText+' · '+sortLabel+(filters.length?' · '+filters.join(' / '):'');
       if(!filtered.length){$('matrix').innerHTML='<div class="empty">'+(countryFiltered.length?'当前指标筛选没有节点。请放宽 RTT / HTTP / 抖动 / 丢包上限。':'当前分类没有节点。请在管理设置里检查机场订阅。')+'</div>';return}
       const metricHead=matrixCarriers.map(c=>'<th>'+escapeHTML(c[1])+'</th>').join('');
-      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span><button type="button" class="node-curve" data-curve-node="'+escapeHTML(row.node.id)+'">曲线</button></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td>'+escapeHTML(row.node.category||'默认')+'</td><td>'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td>'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
+      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:28%">节点</th><th>分类</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col" data-label="'+escapeHTML(c[1])+'">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td class="node-cell"><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span><button type="button" class="node-curve" data-curve-node="'+escapeHTML(row.node.id)+'">曲线</button></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></td><td class="info-cell" data-label="分类">'+escapeHTML(row.node.category||'默认')+'</td><td class="info-cell" data-label="机场">'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td class="info-cell" data-label="协议">'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
       document.querySelectorAll('[data-curve-node]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();const row=lastOverview.find(item=>item.node&&item.node.id===btn.dataset.curveNode);openCurve(row).catch(err=>toast(err.message,true))}));
     }
     function renderProviders(providers,statuses){
