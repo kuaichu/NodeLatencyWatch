@@ -325,6 +325,12 @@ func (s *Server) RefreshProviders() error {
 		byID[node.ID] = node
 	}
 	s.nodesMu.Lock()
+	if len(all) == 0 && len(failures) > 0 && len(s.nodes) > 0 {
+		s.lastRefresh = time.Now()
+		s.lastRefreshError = strings.Join(failures, "; ")
+		s.nodesMu.Unlock()
+		return fmt.Errorf("%s", strings.Join(failures, "; "))
+	}
 	s.nodes = all
 	s.nodesByID = byID
 	s.lastRefresh = time.Now()
@@ -378,12 +384,12 @@ func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
 	s.nodesMu.RLock()
 	nodes := append([]model.ProxyNode(nil), s.nodes...)
 	s.nodesMu.RUnlock()
-	writeJSON(w, nodes)
+	writeJSON(w, publicNodes(nodes))
 }
 
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	cfg := s.configSnapshot()
-	agentIDs := configuredAgentSet(cfg)
+	agentCarriers := configuredAgentCarriers(cfg)
 	s.nodesMu.RLock()
 	nodes := append([]model.ProxyNode(nil), s.nodes...)
 	s.nodesMu.RUnlock()
@@ -392,7 +398,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"error": err.Error()})
 		return
 	}
-	samples = filterSamplesForAgents(samples, agentIDs)
+	samples = filterSamplesForAgents(samples, agentCarriers)
 	latestByNodeCarrier := make(map[string]map[string]model.NodeSample)
 	stats := make(map[string][]model.NodeSample)
 	for _, sample := range samples {
@@ -411,7 +417,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	}
 	overview := make([]model.NodeOverview, 0, len(nodes))
 	for _, node := range nodes {
-		item := model.NodeOverview{Node: node}
+		item := model.NodeOverview{Node: publicNode(node)}
 		for _, sample := range latestByNodeCarrier[node.ID] {
 			item.Latest = append(item.Latest, sample)
 		}
@@ -760,12 +766,16 @@ func (s *Server) samplesFromReport(report model.AgentReport) []model.NodeSample 
 			DNSMs:        result.DNSMs,
 			TCPMs:        result.TCPMs,
 			TLSMs:        result.TLSMs,
+			MaxRTTMs:     result.MaxRTTMs,
+			RTTStdDevMs:  result.RTTStdDevMs,
+			HTTPMs:       result.HTTPMs,
 			Attempts:     result.Attempts,
 			Successes:    result.Successes,
 			LossRate:     result.LossRate,
 			Success:      result.Success,
 			Error:        result.Error,
 			ResolvedIP:   result.ResolvedIP,
+			ProbeMode:    result.ProbeMode,
 		})
 	}
 	return samples
@@ -926,6 +936,17 @@ func configuredAgentSet(cfg *config.Config) map[string]struct{} {
 	return out
 }
 
+func configuredAgentCarriers(cfg *config.Config) map[string]string {
+	out := make(map[string]string, len(cfg.Agents))
+	for _, peer := range cfg.Agents {
+		id := strings.ToLower(strings.TrimSpace(peer.ID))
+		if id != "" {
+			out[id] = model.NormalizeCarrier(peer.Carrier)
+		}
+	}
+	return out
+}
+
 func countReportsForAgents(reports []model.AgentReport, agentIDs map[string]struct{}) int {
 	if len(agentIDs) == 0 {
 		return 0
@@ -939,17 +960,34 @@ func countReportsForAgents(reports []model.AgentReport, agentIDs map[string]stru
 	return count
 }
 
-func filterSamplesForAgents(samples []model.NodeSample, agentIDs map[string]struct{}) []model.NodeSample {
-	if len(agentIDs) == 0 || len(samples) == 0 {
+func filterSamplesForAgents(samples []model.NodeSample, agentCarriers map[string]string) []model.NodeSample {
+	if len(agentCarriers) == 0 || len(samples) == 0 {
 		return nil
 	}
 	out := samples[:0]
 	for _, sample := range samples {
-		if _, ok := agentIDs[strings.ToLower(strings.TrimSpace(sample.AgentID))]; ok {
+		carrier, ok := agentCarriers[strings.ToLower(strings.TrimSpace(sample.AgentID))]
+		if !ok {
+			continue
+		}
+		if carrier == "unknown" || carrier == model.NormalizeCarrier(sample.Carrier) {
 			out = append(out, sample)
 		}
 	}
 	return out
+}
+
+func publicNodes(nodes []model.ProxyNode) []model.ProxyNode {
+	out := make([]model.ProxyNode, len(nodes))
+	for i, node := range nodes {
+		out[i] = publicNode(node)
+	}
+	return out
+}
+
+func publicNode(node model.ProxyNode) model.ProxyNode {
+	node.Outbound = nil
+	return node
 }
 
 func publicBaseURL(r *http.Request) string {

@@ -1,0 +1,62 @@
+package probe
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	mihomoAdapter "github.com/metacubex/mihomo/adapter"
+	mihomoUtils "github.com/metacubex/mihomo/common/utils"
+	"node-latency-watch/internal/model"
+)
+
+const http204TestURL = "https://www.gstatic.com/generate_204"
+
+var expectedHTTP204, _ = mihomoUtils.NewUnsignedRanges[uint16]("204")
+
+func probeHTTP204Once(node model.ProxyNode, cfg model.ProbeConfig) (float64, error) {
+	if !hasProxyOutbound(node) {
+		return 0, fmt.Errorf("node has no proxy outbound")
+	}
+	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = 5 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	proxy, err := mihomoAdapter.ParseProxy(cloneOutbound(node.Outbound))
+	if err != nil {
+		return 0, fmt.Errorf("parse proxy: %w", err)
+	}
+	defer proxy.Close()
+
+	delay, err := proxy.URLTest(ctx, http204TestURL, expectedHTTP204)
+	if err != nil {
+		return 0, fmt.Errorf("http 204: %w", err)
+	}
+	return float64(delay), nil
+}
+
+func cloneOutbound(src map[string]any) map[string]any {
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = cloneOutboundValue(v)
+	}
+	return out
+}
+
+func cloneOutboundValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneOutbound(typed)
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = cloneOutboundValue(item)
+		}
+		return out
+	default:
+		return typed
+	}
+}

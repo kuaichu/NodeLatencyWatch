@@ -85,7 +85,15 @@ func fetch(rawURL string) ([]byte, error) {
 	client := &http.Client{
 		Timeout: 20 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS12},
+			TLSClientConfig: &tls.Config{
+				MinVersion: tls.VersionTLS12,
+				CurvePreferences: []tls.CurveID{
+					tls.X25519,
+					tls.CurveP256,
+					tls.CurveP384,
+					tls.CurveP521,
+				},
+			},
 		},
 	}
 	req, err := http.NewRequest("GET", rawURL, nil)
@@ -186,6 +194,7 @@ func parseClash(provider model.Provider, data []byte) ([]model.ProxyNode, error)
 			Host:       stringValue(item, "host"),
 			Path:       stringValue(item, "path"),
 			Meta:       map[string]string{},
+			Outbound:   cloneProxyMapping(item),
 		}
 		node.Raw = fmt.Sprintf("%s|%s|%s|%d|%s", provider.ID, protocol, server, port, name)
 		node.ID = nodeID(node)
@@ -260,6 +269,20 @@ func parseVMess(provider model.Provider, raw string) (model.ProxyNode, bool) {
 		Host:       stringValue(doc, "host"),
 		Path:       stringValue(doc, "path"),
 		Raw:        raw,
+		Outbound: map[string]any{
+			"name":             name,
+			"type":             "vmess",
+			"server":           server,
+			"port":             port,
+			"uuid":             stringValue(doc, "id"),
+			"alterId":          intValue(doc, "aid"),
+			"cipher":           firstNonEmpty(stringValue(doc, "scy"), "auto"),
+			"tls":              strings.EqualFold(stringValue(doc, "tls"), "tls"),
+			"servername":       firstNonEmpty(stringValue(doc, "sni"), stringValue(doc, "host")),
+			"network":          stringValue(doc, "net"),
+			"ws-opts":          map[string]any{"path": stringValue(doc, "path"), "headers": map[string]any{"Host": stringValue(doc, "host")}},
+			"skip-cert-verify": true,
+		},
 	}
 	node.ID = nodeID(node)
 	return node, true
@@ -301,6 +324,7 @@ func parseURLNode(provider model.Provider, raw string) (model.ProxyNode, bool) {
 		Host:       query.Get("host"),
 		Path:       query.Get("path"),
 		Raw:        raw,
+		Outbound:   outboundFromURLNode(protocol, name, host, port, u),
 	}
 	node.ID = nodeID(node)
 	return node, true
@@ -323,6 +347,77 @@ func parseSSHostPort(raw string) (string, int) {
 	}
 	port, _ := strconv.Atoi(portText)
 	return host, port
+}
+
+func cloneProxyMapping(src map[string]any) map[string]any {
+	out := make(map[string]any, len(src))
+	for k, v := range src {
+		out[k] = cloneAny(v)
+	}
+	return out
+}
+
+func cloneAny(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneProxyMapping(typed)
+	case []any:
+		out := make([]any, len(typed))
+		for i, item := range typed {
+			out[i] = cloneAny(item)
+		}
+		return out
+	default:
+		return typed
+	}
+}
+
+func outboundFromURLNode(protocol, name, host string, port int, u *url.URL) map[string]any {
+	query := u.Query()
+	out := map[string]any{
+		"name":             name,
+		"type":             protocol,
+		"server":           host,
+		"port":             port,
+		"skip-cert-verify": true,
+	}
+	if user := u.User.Username(); user != "" {
+		switch protocol {
+		case "vless", "vmess":
+			out["uuid"] = user
+		case "trojan", "hysteria2":
+			out["password"] = user
+		}
+	}
+	if password, ok := u.User.Password(); ok && password != "" {
+		out["password"] = password
+	}
+	if security := firstNonEmpty(query.Get("security"), query.Get("tls")); security != "" {
+		out["tls"] = security == "tls" || security == "reality" || security == "true"
+		if security == "reality" {
+			out["reality-opts"] = map[string]any{
+				"public-key": firstNonEmpty(query.Get("pbk"), query.Get("public-key")),
+				"short-id":   firstNonEmpty(query.Get("sid"), query.Get("short-id")),
+			}
+		}
+	}
+	if sni := firstNonEmpty(query.Get("sni"), query.Get("peer"), query.Get("servername")); sni != "" {
+		out["servername"] = sni
+	}
+	if flow := query.Get("flow"); flow != "" {
+		out["flow"] = flow
+	}
+	if fp := firstNonEmpty(query.Get("fp"), query.Get("client-fingerprint")); fp != "" {
+		out["client-fingerprint"] = fp
+	}
+	if network := firstNonEmpty(query.Get("type"), query.Get("network")); network != "" && network != "tcp" {
+		out["network"] = network
+	}
+	if path := query.Get("path"); path != "" {
+		hostHeader := query.Get("host")
+		out["ws-opts"] = map[string]any{"path": path, "headers": map[string]any{"Host": hostHeader}}
+	}
+	return out
 }
 
 func nodeID(node model.ProxyNode) string {

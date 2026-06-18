@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"math"
 	"net"
 	"sort"
 	"strings"
@@ -48,15 +49,23 @@ func Run(nodes []model.ProxyNode, cfg model.ProbeConfig) []model.NodeResult {
 		if results[i].Success != results[j].Success {
 			return results[i].Success
 		}
-		return results[i].TCPMs < results[j].TCPMs
+		return sortLatency(results[i]) < sortLatency(results[j])
 	})
 	return results
 }
 
 func ProbeNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResult {
+	if hasProxyOutbound(node) {
+		return probeProxyNode(node, cfg)
+	}
+	return probeEntryNode(node, cfg)
+}
+
+func probeEntryNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResult {
 	result := model.NodeResult{
-		NodeID:   node.ID,
-		Attempts: cfg.Attempts,
+		NodeID:    node.ID,
+		Attempts:  cfg.Attempts,
+		ProbeMode: "entry",
 	}
 	var successes int
 	var dnsValues, tcpValues, tlsValues []float64
@@ -86,11 +95,95 @@ func ProbeNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResult {
 	result.DNSMs = average(dnsValues)
 	result.TCPMs = average(tcpValues)
 	result.TLSMs = average(tlsValues)
+	result.MaxRTTMs = max(tcpValues)
+	result.RTTStdDevMs = stddev(tcpValues)
 	result.ResolvedIP = resolvedIP
 	if !result.Success && lastErr != nil {
 		result.Error = lastErr.Error()
 	}
 	return result
+}
+
+func probeProxyNode(node model.ProxyNode, cfg model.ProbeConfig) model.NodeResult {
+	result := model.NodeResult{
+		NodeID:    node.ID,
+		Attempts:  cfg.Attempts,
+		ProbeMode: "http-204",
+	}
+	var successes int
+	var dnsValues, tcpValues, httpValues []float64
+	var resolvedIP string
+	var lastErr error
+	for i := 0; i < cfg.Attempts; i++ {
+		entry := probeEntryOnce(node, cfg)
+		if entry.err == nil {
+			dnsValues = append(dnsValues, entry.dnsMs)
+			tcpValues = append(tcpValues, entry.tcpMs)
+			if resolvedIP == "" {
+				resolvedIP = entry.resolvedIP
+			}
+		} else {
+			lastErr = entry.err
+		}
+		httpMs, err := probeHTTP204Once(node, cfg)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		successes++
+		httpValues = append(httpValues, httpMs)
+	}
+	result.Successes = successes
+	if cfg.Attempts > 0 {
+		result.LossRate = float64(cfg.Attempts-successes) / float64(cfg.Attempts) * 100
+	}
+	result.Success = successes > 0
+	result.DNSMs = average(dnsValues)
+	result.TCPMs = average(tcpValues)
+	result.MaxRTTMs = max(tcpValues)
+	result.RTTStdDevMs = stddev(tcpValues)
+	result.HTTPMs = average(httpValues)
+	result.ResolvedIP = resolvedIP
+	if !result.Success && lastErr != nil {
+		result.Error = lastErr.Error()
+	}
+	return result
+}
+
+func probeEntryOnce(node model.ProxyNode, cfg model.ProbeConfig) attemptResult {
+	timeout := time.Duration(cfg.TimeoutSeconds) * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	dialer := &net.Dialer{Timeout: timeout}
+	host := strings.TrimSpace(node.Server)
+	if host == "" || node.Port <= 0 {
+		return attemptResult{err: fmt.Errorf("node target is empty")}
+	}
+
+	startDNS := time.Now()
+	resolved := host
+	if net.ParseIP(host) == nil {
+		ips, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return attemptResult{err: fmt.Errorf("dns lookup %s: %w", host, err)}
+		}
+		if len(ips) == 0 {
+			return attemptResult{err: fmt.Errorf("dns lookup %s: no records", host)}
+		}
+		resolved = ips[0].IP.String()
+	}
+	dnsMs := float64(time.Since(startDNS).Microseconds()) / 1000.0
+
+	address := net.JoinHostPort(host, fmt.Sprintf("%d", node.Port))
+	startTCP := time.Now()
+	conn, err := dialer.DialContext(ctx, "tcp", address)
+	if err != nil {
+		return attemptResult{dnsMs: dnsMs, resolvedIP: resolved, err: fmt.Errorf("tcp connect %s: %w", address, err)}
+	}
+	tcpMs := float64(time.Since(startTCP).Microseconds()) / 1000.0
+	conn.Close()
+	return attemptResult{dnsMs: dnsMs, tcpMs: tcpMs, resolvedIP: resolved}
 }
 
 func probeOnce(node model.ProxyNode, cfg model.ProbeConfig) attemptResult {
@@ -132,6 +225,12 @@ func probeOnce(node model.ProxyNode, cfg model.ProbeConfig) attemptResult {
 		tlsConn := tls.Client(conn, &tls.Config{
 			ServerName:         serverName,
 			InsecureSkipVerify: true,
+			CurvePreferences: []tls.CurveID{
+				tls.X25519,
+				tls.CurveP256,
+				tls.CurveP384,
+				tls.CurveP521,
+			},
 		})
 		startTLS := time.Now()
 		if err := tlsConn.HandshakeContext(ctx); err != nil {
@@ -166,6 +265,47 @@ func average(values []float64) float64 {
 		sum += value
 	}
 	return sum / float64(len(values))
+}
+
+func max(values []float64) float64 {
+	out := 0.0
+	for _, value := range values {
+		if value > out {
+			out = value
+		}
+	}
+	return out
+}
+
+func stddev(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	avg := average(values)
+	sum := 0.0
+	for _, value := range values {
+		delta := value - avg
+		sum += delta * delta
+	}
+	return math.Sqrt(sum / float64(len(values)))
+}
+
+func sortLatency(result model.NodeResult) float64 {
+	if result.HTTPMs > 0 {
+		return result.HTTPMs
+	}
+	if result.TCPMs > 0 {
+		return result.TCPMs
+	}
+	return 1<<31 - 1
+}
+
+func hasProxyOutbound(node model.ProxyNode) bool {
+	if len(node.Outbound) == 0 {
+		return false
+	}
+	_, ok := node.Outbound["type"].(string)
+	return ok
 }
 
 func firstNonEmpty(values ...string) string {

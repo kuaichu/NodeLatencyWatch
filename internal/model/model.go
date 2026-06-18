@@ -24,6 +24,7 @@ type ProxyNode struct {
 	Path       string            `json:"path,omitempty"`
 	Raw        string            `json:"-"`
 	Meta       map[string]string `json:"meta,omitempty"`
+	Outbound   map[string]any    `json:"outbound,omitempty"`
 }
 
 type AgentPeer struct {
@@ -53,16 +54,20 @@ type JobResponse struct {
 }
 
 type NodeResult struct {
-	NodeID     string  `json:"nodeId"`
-	DNSMs      float64 `json:"dnsMs"`
-	TCPMs      float64 `json:"tcpMs"`
-	TLSMs      float64 `json:"tlsMs,omitempty"`
-	Attempts   int     `json:"attempts"`
-	Successes  int     `json:"successes"`
-	LossRate   float64 `json:"lossRate"`
-	Success    bool    `json:"success"`
-	Error      string  `json:"error,omitempty"`
-	ResolvedIP string  `json:"resolvedIp,omitempty"`
+	NodeID      string  `json:"nodeId"`
+	DNSMs       float64 `json:"dnsMs"`
+	TCPMs       float64 `json:"tcpMs"`
+	TLSMs       float64 `json:"tlsMs,omitempty"`
+	MaxRTTMs    float64 `json:"maxRttMs,omitempty"`
+	RTTStdDevMs float64 `json:"rttStdDevMs,omitempty"`
+	HTTPMs      float64 `json:"httpMs,omitempty"`
+	Attempts    int     `json:"attempts"`
+	Successes   int     `json:"successes"`
+	LossRate    float64 `json:"lossRate"`
+	Success     bool    `json:"success"`
+	Error       string  `json:"error,omitempty"`
+	ResolvedIP  string  `json:"resolvedIp,omitempty"`
+	ProbeMode   string  `json:"probeMode,omitempty"`
 }
 
 type AgentReport struct {
@@ -94,12 +99,16 @@ type NodeSample struct {
 	DNSMs        float64   `json:"dnsMs"`
 	TCPMs        float64   `json:"tcpMs"`
 	TLSMs        float64   `json:"tlsMs"`
+	MaxRTTMs     float64   `json:"maxRttMs"`
+	RTTStdDevMs  float64   `json:"rttStdDevMs"`
+	HTTPMs       float64   `json:"httpMs"`
 	Attempts     int       `json:"attempts"`
 	Successes    int       `json:"successes"`
 	LossRate     float64   `json:"lossRate"`
 	Success      bool      `json:"success"`
 	Error        string    `json:"error,omitempty"`
 	ResolvedIP   string    `json:"resolvedIp,omitempty"`
+	ProbeMode    string    `json:"probeMode,omitempty"`
 }
 
 type NodeOverview struct {

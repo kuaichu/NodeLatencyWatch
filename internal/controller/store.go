@@ -64,12 +64,16 @@ CREATE TABLE IF NOT EXISTS node_samples (
 	dns_ms REAL NOT NULL DEFAULT 0,
 	tcp_ms REAL NOT NULL DEFAULT 0,
 	tls_ms REAL NOT NULL DEFAULT 0,
+	max_rtt_ms REAL NOT NULL DEFAULT 0,
+	rtt_stddev_ms REAL NOT NULL DEFAULT 0,
+	http_ms REAL NOT NULL DEFAULT 0,
 	attempts INTEGER NOT NULL DEFAULT 0,
 	successes INTEGER NOT NULL DEFAULT 0,
 	loss_rate REAL NOT NULL DEFAULT 0,
 	success INTEGER NOT NULL DEFAULT 0,
 	error TEXT NOT NULL DEFAULT '',
-	resolved_ip TEXT NOT NULL DEFAULT ''
+	resolved_ip TEXT NOT NULL DEFAULT '',
+	probe_mode TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS agent_reports (
 	agent_id TEXT PRIMARY KEY,
@@ -85,6 +89,10 @@ CREATE INDEX IF NOT EXISTS idx_agent_reports_finished ON agent_reports(finished_
 		return err
 	}
 	_, _ = s.db.Exec(`ALTER TABLE node_samples ADD COLUMN category TEXT NOT NULL DEFAULT ''`)
+	_, _ = s.db.Exec(`ALTER TABLE node_samples ADD COLUMN max_rtt_ms REAL NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE node_samples ADD COLUMN rtt_stddev_ms REAL NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE node_samples ADD COLUMN http_ms REAL NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE node_samples ADD COLUMN probe_mode TEXT NOT NULL DEFAULT ''`)
 	return err
 }
 
@@ -100,8 +108,8 @@ func (s *Store) InsertSamples(samples []model.NodeSample) error {
 	stmt, err := tx.Prepare(`INSERT INTO node_samples(
 		time, agent_id, agent_name, carrier, carrier_label, probe_source,
 		provider_id, provider, category, node_id, node_name, protocol, server, port,
-		dns_ms, tcp_ms, tls_ms, attempts, successes, loss_rate, success, error, resolved_ip
-	) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		dns_ms, tcp_ms, tls_ms, max_rtt_ms, rtt_stddev_ms, http_ms, attempts, successes, loss_rate, success, error, resolved_ip, probe_mode
+	) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -114,7 +122,8 @@ func (s *Store) InsertSamples(samples []model.NodeSample) error {
 		if _, err := stmt.Exec(
 			timeText(sample.Time), sample.AgentID, sample.AgentName, sample.Carrier, sample.CarrierLabel, sample.ProbeSource,
 			sample.ProviderID, sample.Provider, sample.Category, sample.NodeID, sample.NodeName, sample.Protocol, sample.Server, sample.Port,
-			sample.DNSMs, sample.TCPMs, sample.TLSMs, sample.Attempts, sample.Successes, sample.LossRate, success, sample.Error, sample.ResolvedIP,
+			sample.DNSMs, sample.TCPMs, sample.TLSMs, sample.MaxRTTMs, sample.RTTStdDevMs, sample.HTTPMs,
+			sample.Attempts, sample.Successes, sample.LossRate, success, sample.Error, sample.ResolvedIP, sample.ProbeMode,
 		); err != nil {
 			return err
 		}
@@ -126,7 +135,7 @@ func (s *Store) LatestSamples(limit int) ([]model.NodeSample, error) {
 	if limit <= 0 {
 		limit = 500
 	}
-	rows, err := s.db.Query(`SELECT time, agent_id, agent_name, carrier, carrier_label, probe_source, provider_id, provider, category, node_id, node_name, protocol, server, port, dns_ms, tcp_ms, tls_ms, attempts, successes, loss_rate, success, error, resolved_ip
+	rows, err := s.db.Query(`SELECT time, agent_id, agent_name, carrier, carrier_label, probe_source, provider_id, provider, category, node_id, node_name, protocol, server, port, dns_ms, tcp_ms, tls_ms, max_rtt_ms, rtt_stddev_ms, http_ms, attempts, successes, loss_rate, success, error, resolved_ip, probe_mode
 		FROM node_samples ORDER BY id DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -147,7 +156,7 @@ func (s *Store) SamplesForNode(nodeID string, since time.Time, limit int) ([]mod
 	if limit <= 0 {
 		limit = 1000
 	}
-	rows, err := s.db.Query(`SELECT time, agent_id, agent_name, carrier, carrier_label, probe_source, provider_id, provider, category, node_id, node_name, protocol, server, port, dns_ms, tcp_ms, tls_ms, attempts, successes, loss_rate, success, error, resolved_ip
+	rows, err := s.db.Query(`SELECT time, agent_id, agent_name, carrier, carrier_label, probe_source, provider_id, provider, category, node_id, node_name, protocol, server, port, dns_ms, tcp_ms, tls_ms, max_rtt_ms, rtt_stddev_ms, http_ms, attempts, successes, loss_rate, success, error, resolved_ip, probe_mode
 		FROM node_samples WHERE node_id = ? AND time >= ? ORDER BY time ASC LIMIT ?`, nodeID, timeText(since), limit)
 	if err != nil {
 		return nil, err
@@ -215,7 +224,8 @@ func scanSample(rows interface {
 	var success int
 	err := rows.Scan(&timeRaw, &sample.AgentID, &sample.AgentName, &sample.Carrier, &sample.CarrierLabel, &sample.ProbeSource,
 		&sample.ProviderID, &sample.Provider, &sample.Category, &sample.NodeID, &sample.NodeName, &sample.Protocol, &sample.Server, &sample.Port,
-		&sample.DNSMs, &sample.TCPMs, &sample.TLSMs, &sample.Attempts, &sample.Successes, &sample.LossRate, &success, &sample.Error, &sample.ResolvedIP)
+		&sample.DNSMs, &sample.TCPMs, &sample.TLSMs, &sample.MaxRTTMs, &sample.RTTStdDevMs, &sample.HTTPMs,
+		&sample.Attempts, &sample.Successes, &sample.LossRate, &success, &sample.Error, &sample.ResolvedIP, &sample.ProbeMode)
 	if err != nil {
 		return sample, err
 	}
