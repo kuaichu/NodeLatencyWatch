@@ -45,6 +45,7 @@ type ProbeConfig struct {
 	Attempts        int    `json:"attempts" yaml:"attempts"`
 	MaxConcurrency  int    `json:"maxConcurrency" yaml:"max_concurrency"`
 	TLSMode         string `json:"tlsMode" yaml:"tls_mode"`
+	TestURL         string `json:"testUrl" yaml:"test_url"`
 }
 
 type JobResponse struct {

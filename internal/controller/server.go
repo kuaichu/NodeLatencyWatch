@@ -1312,6 +1312,7 @@ probe:
   attempts: 3
   max_concurrency: 32
   tls_mode: auto
+  test_url: "http://www.gstatic.com/generate_204"
 YAML
 chmod 0600 "$CONFIG_DIR/agent.yaml"
 

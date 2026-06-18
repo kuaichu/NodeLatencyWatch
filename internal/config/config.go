@@ -47,6 +47,7 @@ func Load(path string) (*Config, error) {
 			Attempts:        3,
 			MaxConcurrency:  32,
 			TLSMode:         "auto",
+			TestURL:         "http://www.gstatic.com/generate_204",
 		},
 		Agent: AgentConfig{
 			ReportIntervalSec: 300,
@@ -131,6 +132,20 @@ func (c *Config) Normalize(configPath string) error {
 	}
 	if c.Probe.TLSMode != "auto" && c.Probe.TLSMode != "always" && c.Probe.TLSMode != "never" {
 		return fmt.Errorf("probe.tls_mode must be auto, always, or never")
+	}
+	c.Probe.TestURL = strings.TrimSpace(c.Probe.TestURL)
+	if c.Probe.TestURL == "" {
+		c.Probe.TestURL = "http://www.gstatic.com/generate_204"
+	}
+	testURL, err := url.ParseRequestURI(c.Probe.TestURL)
+	if err != nil {
+		return fmt.Errorf("probe.test_url is invalid: %w", err)
+	}
+	if testURL.Scheme != "http" && testURL.Scheme != "https" {
+		return fmt.Errorf("probe.test_url must use http or https")
+	}
+	if strings.TrimSpace(testURL.Hostname()) == "" {
+		return fmt.Errorf("probe.test_url host is required")
 	}
 	c.Agent.Carrier = model.NormalizeCarrier(c.Agent.Carrier)
 	if c.IsAgentMode() {

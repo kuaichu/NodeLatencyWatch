@@ -51,6 +51,31 @@ func TestProbeProxyNodeUsesProxyTCPForRTT(t *testing.T) {
 	}
 }
 
+func TestProbeTestURLDefaultsToHTTP204(t *testing.T) {
+	got := probeTestURL(model.ProbeConfig{})
+	if got != "http://www.gstatic.com/generate_204" {
+		t.Fatalf("probeTestURL() = %q", got)
+	}
+}
+
+func TestHTTP204MetadataUsesConfiguredURLPort(t *testing.T) {
+	metadata, err := http204Metadata("http://cp.cloudflare.com/generate_204")
+	if err != nil {
+		t.Fatalf("http204Metadata() error = %v", err)
+	}
+	if got := metadata.RemoteAddress(); got != "cp.cloudflare.com:80" {
+		t.Fatalf("RemoteAddress() = %q, want cp.cloudflare.com:80", got)
+	}
+
+	metadata, err = http204Metadata("https://www.gstatic.com/generate_204")
+	if err != nil {
+		t.Fatalf("http204Metadata() error = %v", err)
+	}
+	if got := metadata.RemoteAddress(); got != "www.gstatic.com:443" {
+		t.Fatalf("RemoteAddress() = %q, want www.gstatic.com:443", got)
+	}
+}
+
 func assertFloat(t *testing.T, name string, got float64, want float64) {
 	t.Helper()
 	if math.Abs(got-want) > 0.001 {

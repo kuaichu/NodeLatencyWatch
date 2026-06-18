@@ -13,7 +13,7 @@ import (
 	"node-latency-watch/internal/model"
 )
 
-const http204TestURL = "https://www.gstatic.com/generate_204"
+const defaultHTTP204TestURL = "http://www.gstatic.com/generate_204"
 
 var expectedHTTP204, _ = mihomoUtils.NewUnsignedRanges[uint16]("204")
 
@@ -31,7 +31,8 @@ func probeProxyTCPOnce(node model.ProxyNode, cfg model.ProbeConfig) (float64, er
 	}
 	defer proxy.Close()
 
-	metadata, err := http204Metadata()
+	testURL := probeTestURL(cfg)
+	metadata, err := http204Metadata(testURL)
 	if err != nil {
 		return 0, err
 	}
@@ -60,11 +61,19 @@ func probeHTTP204Once(node model.ProxyNode, cfg model.ProbeConfig) (float64, err
 	}
 	defer proxy.Close()
 
-	delay, err := proxy.URLTest(ctx, http204TestURL, expectedHTTP204)
+	testURL := probeTestURL(cfg)
+	delay, err := proxy.URLTest(ctx, testURL, expectedHTTP204)
 	if err != nil {
 		return 0, fmt.Errorf("http 204: %w", err)
 	}
 	return float64(delay), nil
+}
+
+func probeTestURL(cfg model.ProbeConfig) string {
+	if cfg.TestURL != "" {
+		return cfg.TestURL
+	}
+	return defaultHTTP204TestURL
 }
 
 func probeTimeout(cfg model.ProbeConfig) time.Duration {
@@ -83,8 +92,8 @@ func parseProxy(node model.ProxyNode) (C.Proxy, error) {
 	return proxy, nil
 }
 
-func http204Metadata() (C.Metadata, error) {
-	u, err := url.Parse(http204TestURL)
+func http204Metadata(testURL string) (C.Metadata, error) {
+	u, err := url.Parse(testURL)
 	if err != nil {
 		return C.Metadata{}, err
 	}
@@ -97,7 +106,7 @@ func http204Metadata() (C.Metadata, error) {
 		case "http":
 			port = "80"
 		default:
-			return C.Metadata{}, fmt.Errorf("%s scheme not supported", http204TestURL)
+			return C.Metadata{}, fmt.Errorf("%s scheme not supported", testURL)
 		}
 	}
 

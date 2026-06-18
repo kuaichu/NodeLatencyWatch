@@ -338,6 +338,7 @@
                 <div class="field"><label>尝试次数</label><input id="probeAttempts" type="number" min="1"></div>
                 <div class="field"><label>最大并发</label><input id="probeConcurrency" type="number" min="1"></div>
                 <div class="field"><label>TLS 模式</label><select id="probeTLS"><option value="auto">auto</option><option value="always">always</option><option value="never">never</option></select></div>
+                <div class="field" style="grid-column:1/-1"><label>204 测试地址</label><input id="probeTestURL" type="url" placeholder="http://www.gstatic.com/generate_204"></div>
               </div>
             </div>
           </section>
@@ -925,10 +926,10 @@
       renderDiscoveredAgents(lastAgentStatuses);
       toast('待登记 Agent 已刷新');
     }
-    function renderSettings(cfg){$('probeInterval').value=cfg.probe?.intervalSeconds||300;$('probeTimeout').value=cfg.probe?.timeoutSeconds||5;$('probeAttempts').value=cfg.probe?.attempts||3;$('probeConcurrency').value=cfg.probe?.maxConcurrency||32;$('probeTLS').value=cfg.probe?.tlsMode||'auto';$('agentTTL').value=cfg.agentReportTtl||900;$('tokenHint').textContent=cfg.agentTokenSet?'当前已配置 Token，留空保存则保持不变。':'当前未配置 Token。'}
+    function renderSettings(cfg){$('probeInterval').value=cfg.probe?.intervalSeconds||300;$('probeTimeout').value=cfg.probe?.timeoutSeconds||5;$('probeAttempts').value=cfg.probe?.attempts||3;$('probeConcurrency').value=cfg.probe?.maxConcurrency||32;$('probeTLS').value=cfg.probe?.tlsMode||'auto';$('probeTestURL').value=cfg.probe?.testUrl||'http://www.gstatic.com/generate_204';$('agentTTL').value=cfg.agentReportTtl||900;$('tokenHint').textContent=cfg.agentTokenSet?'当前已配置 Token，留空保存则保持不变。':'当前未配置 Token。'}
     function collectProviders(){return Array.from(document.querySelectorAll('[data-provider-index]')).map(card=>{const get=f=>card.querySelector('[data-provider-field="'+f+'"]').value.trim();const id=get('id'), name=get('name');return{id,name,category:name||id||card.dataset.providerCategory||'默认',subscriptionUrl:get('subscriptionUrl'),subscriptionFile:get('subscriptionFile')}})}
     function collectAgents(){return Array.from(document.querySelectorAll('[data-agent-index]')).map(card=>{const get=f=>card.querySelector('[data-agent-field="'+f+'"]');return{id:get('id').value.trim(),name:get('name').value.trim(),probeSource:get('probeSource').value.trim(),carrier:get('carrier').value}})}
-    function collectProbe(){return{intervalSeconds:Number($('probeInterval').value)||300,timeoutSeconds:Number($('probeTimeout').value)||5,attempts:Number($('probeAttempts').value)||1,maxConcurrency:Number($('probeConcurrency').value)||16,tlsMode:$('probeTLS').value||'auto'}}
+    function collectProbe(){return{intervalSeconds:Number($('probeInterval').value)||300,timeoutSeconds:Number($('probeTimeout').value)||5,attempts:Number($('probeAttempts').value)||1,maxConcurrency:Number($('probeConcurrency').value)||16,tlsMode:$('probeTLS').value||'auto',testUrl:$('probeTestURL').value.trim()||'http://www.gstatic.com/generate_204'}}
     async function saveConfig(partial,options={}){
       const payload={agentReportTtl:Number($('agentTTL').value)||adminConfig.agentReportTtl||900,agents:partial.agents||collectAgents(),providers:partial.providers||collectProviders(),probe:partial.probe||collectProbe()};
       const token=$('agentToken').value.trim();if(token)payload.agentToken=token;
@@ -1015,7 +1016,7 @@
     $('fetchRemoteSubBtn').addEventListener('click',()=>loadProviderSubscription(true).catch(e=>toast(e.message,true)));
     $('saveSubContentBtn').addEventListener('click',()=>saveProviderSubscriptionContent().catch(e=>toast(e.message,true)));
     $('clearSubOverrideBtn').addEventListener('click',()=>clearProviderSubscriptionOverride().catch(e=>toast(e.message,true)));
-    ['agentToken','agentTTL','probeInterval','probeTimeout','probeAttempts','probeConcurrency','probeTLS'].forEach(id=>$(id).addEventListener('input',markSettingsDirty));
+    ['agentToken','agentTTL','probeInterval','probeTimeout','probeAttempts','probeConcurrency','probeTLS','probeTestURL'].forEach(id=>$(id).addEventListener('input',markSettingsDirty));
     $('modalSave').addEventListener('click',()=>{const partial=activeTab==='providers'?{providers:collectProviders()}:activeTab==='agents'?{agents:collectAgents()}:{probe:collectProbe()};saveConfig(partial).catch(e=>toast(e.message,true))});
     load().catch(e=>toast(e.message,true));setInterval(()=>load().catch(console.error),5000);
   </script>

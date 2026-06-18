@@ -94,7 +94,10 @@ func runJob(cfg *config.Config, job *model.JobResponse) model.AgentReport {
 	if probeCfg.TLSMode == "" {
 		probeCfg.TLSMode = cfg.Probe.TLSMode
 	}
-	log.Printf("[agent] probing %d node(s), attempts=%d concurrency=%d tls=%s", len(job.Nodes), probeCfg.Attempts, probeCfg.MaxConcurrency, probeCfg.TLSMode)
+	if probeCfg.TestURL == "" {
+		probeCfg.TestURL = cfg.Probe.TestURL
+	}
+	log.Printf("[agent] probing %d node(s), attempts=%d concurrency=%d tls=%s test_url=%s", len(job.Nodes), probeCfg.Attempts, probeCfg.MaxConcurrency, probeCfg.TLSMode, probeCfg.TestURL)
 	results := probe.Run(job.Nodes, probeCfg)
 	okCount := 0
 	for _, result := range results {
