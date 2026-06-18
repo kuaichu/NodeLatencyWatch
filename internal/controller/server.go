@@ -179,7 +179,7 @@ func (s *Server) handleProviderSubscription(w http.ResponseWriter, r *http.Reque
 		}
 		provider, _ := s.providerByID(req.ID)
 		nodes, parseErr := subscription.Parse(provider, []byte(req.Content))
-		refreshErr := s.RefreshProviders()
+		_, refreshErr := s.RefreshProvider(req.ID)
 		resp := map[string]any{"ok": true, "nodeCount": len(nodes), "config": s.adminConfig()}
 		if parseErr != nil {
 			resp["parseError"] = parseErr.Error()
@@ -195,7 +195,7 @@ func (s *Server) handleProviderSubscription(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		resp := map[string]any{"ok": true, "config": s.adminConfig()}
-		if err := s.RefreshProviders(); err != nil {
+		if _, err := s.RefreshProvider(id); err != nil {
 			resp["refreshError"] = err.Error()
 		}
 		writeJSON(w, resp)
@@ -342,6 +342,44 @@ func (s *Server) RefreshProviders() error {
 		return fmt.Errorf("%s", strings.Join(failures, "; "))
 	}
 	return nil
+}
+
+func (s *Server) RefreshProvider(id string) (int, error) {
+	id = strings.TrimSpace(id)
+	provider, ok := s.providerByID(id)
+	if !ok {
+		return 0, fmt.Errorf("provider not found")
+	}
+	nodes, err := subscription.LoadProvider(provider)
+	if err != nil {
+		return 0, err
+	}
+	s.nodesMu.Lock()
+	all := make([]model.ProxyNode, 0, len(s.nodes)+len(nodes))
+	for _, node := range s.nodes {
+		if node.ProviderID != provider.ID {
+			all = append(all, node)
+		}
+	}
+	all = append(all, nodes...)
+	sort.Slice(all, func(i, j int) bool {
+		if all[i].ProviderID != all[j].ProviderID {
+			return all[i].ProviderID < all[j].ProviderID
+		}
+		return all[i].Name < all[j].Name
+	})
+	byID := make(map[string]model.ProxyNode, len(all))
+	for _, node := range all {
+		byID[node.ID] = node
+	}
+	s.nodes = all
+	s.nodesByID = byID
+	s.lastRefresh = time.Now()
+	s.lastRefreshError = ""
+	s.subscriptionVersion = fmt.Sprintf("%d:%d", s.lastRefresh.Unix(), len(all))
+	s.nodesMu.Unlock()
+	log.Printf("[providers] %s refreshed %d nodes", provider.ID, len(nodes))
+	return len(nodes), nil
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -508,6 +546,16 @@ func (s *Server) handleProviderRefresh(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id != "" {
+		count, err := s.RefreshProvider(id)
+		if err != nil {
+			writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
+			return
+		}
+		writeJSON(w, map[string]any{"ok": true, "nodeCount": count})
+		return
+	}
 	if err := s.RefreshProviders(); err != nil {
 		writeJSON(w, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -546,6 +594,10 @@ func (s *Server) handleAdminConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.replaceConfig(loaded)
+		if r.URL.Query().Get("refresh") == "0" {
+			writeJSON(w, map[string]any{"ok": true, "config": s.adminConfig()})
+			return
+		}
 		if err := s.RefreshProviders(); err != nil {
 			writeJSON(w, map[string]any{"ok": true, "refreshError": err.Error(), "config": s.adminConfig()})
 			return

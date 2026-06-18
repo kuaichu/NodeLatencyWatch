@@ -638,7 +638,7 @@
     }
     function renderCurve(){
       const node=curveState.node;
-      $('curveTitle').textContent=node?node.name:'延迟曲线';
+      $('curveTitle').textContent=node?cleanNodeName(node.name):'延迟曲线';
       $('curveSub').textContent=node?[(node.provider||node.providerId),node.server+':'+node.port].filter(Boolean).join(' · '):'最近采样走势';
       document.querySelectorAll('[data-curve-metric]').forEach(btn=>btn.classList.toggle('active',btn.dataset.curveMetric===curveState.metric));
       const despikeBtn=$('curveDespike'), canDespike=curveState.metric!=='loss';
@@ -753,8 +753,27 @@
       let i=0;
       $('curveLegend').innerHTML=Array.from(groups.keys()).map(key=>'<span class="legend-item"><span class="legend-dot" style="background:'+curvePalette[i++%curvePalette.length]+'"></span>'+escapeHTML(labels.get(key)||key)+'</span>').join('')+'<span class="legend-item"><span class="legend-dot" style="background:#ff6b6b"></span>超时</span>';
     }
+    function flagEmojiCode(value){
+      const match=String(value||'').match(/[\u{1F1E6}-\u{1F1FF}]{2}/u);
+      if(!match)return'';
+      return Array.from(match[0]).map(ch=>String.fromCharCode(ch.codePointAt(0)-0x1F1E6+97)).join('');
+    }
+    function cleanNodeName(value){
+      const raw=String(value||'').trim();
+      return raw.replace(/^(?:[\u{1F1E6}-\u{1F1FF}]{2}\s*)+/u,'').trim()||raw;
+    }
     function countryText(row){const n=row&&row.node?row.node:{};return [n.name,n.server,n.provider,n.category].filter(Boolean).join(' ').replace(/[_-]+/g,' ')}
-    function countryForRow(row){const text=countryText(row);return countries.find(c=>c.patterns.some(pattern=>pattern.test(text)))||unknownCountry}
+    function countryForRow(row){
+      const n=row&&row.node?row.node:{};
+      const emojiCode=flagEmojiCode(n.name);
+      if(emojiCode){
+        const fromEmoji=countries.find(c=>String(c.flagCode===undefined?c.code:c.flagCode||'').toLowerCase()===emojiCode);
+        if(fromEmoji)return fromEmoji;
+        return{code:emojiCode,flagCode:emojiCode,short:emojiCode.toUpperCase(),label:emojiCode.toUpperCase(),patterns:[]};
+      }
+      const text=countryText(row);
+      return countries.find(c=>c.patterns.some(pattern=>pattern.test(text)))||unknownCountry
+    }
     function providerKeyForRow(row){const n=row&&row.node?row.node:{};return n.providerId||n.provider||'unknown'}
     function providerNameForRow(row){const n=row&&row.node?row.node:{};return n.provider||n.providerId||'未知机场'}
     function providerOptionsFor(cfg,rows){
@@ -855,15 +874,30 @@
       $('matrixHint').textContent=(selectedProvider==='all'?'全部机场':providerLabel(selectedProvider))+' · '+countryLabel+' · '+countLabel+' · '+carrierLabelText+' · '+sortLabel+(filters.length?' · '+filters.join(' / '):'');
       if(!filtered.length){$('matrix').innerHTML='<div class="empty">'+(countryFiltered.length?'当前指标筛选没有节点。请放宽 RTT / HTTP / 抖动 / 丢包上限。':'当前机场没有节点。请在管理设置里检查机场订阅。')+'</div>';return}
       const metricHead=matrixCarriers.map(c=>'<th>'+escapeHTML(c[1])+'</th>').join('');
-      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:34%">节点</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row);const metricCells=matrixCarriers.map(c=>'<td class="metric-col" data-label="'+escapeHTML(c[1])+'">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td class="node-cell"><div class="node-cell-layout"><div class="node-main"><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(row.node.name)+'</span></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></div><button type="button" class="node-curve" data-curve-node="'+escapeHTML(row.node.id)+'">曲线</button></div></td><td class="info-cell" data-label="机场">'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td class="info-cell" data-label="协议">'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
+      $('matrix').innerHTML='<div class="table-wrap"><table><thead><tr><th style="width:34%">节点</th><th>机场</th><th>协议</th>'+metricHead+'</tr></thead><tbody>'+filtered.map(row=>{const latest={};(row.latest||[]).forEach(s=>latest[s.carrier]=s);const country=countryForRow(row), nodeName=cleanNodeName(row.node.name);const metricCells=matrixCarriers.map(c=>'<td class="metric-col" data-label="'+escapeHTML(c[1])+'">'+msCell(latest[c[0]])+'</td>').join('');return'<tr><td class="node-cell"><div class="node-cell-layout"><div class="node-main"><span class="node-title">'+flagHTML(country)+'<span class="node">'+escapeHTML(nodeName)+'</span></span><span class="meta">'+escapeHTML(row.node.server)+':'+row.node.port+'</span></div><button type="button" class="node-curve" data-curve-node="'+escapeHTML(row.node.id)+'">曲线</button></div></td><td class="info-cell" data-label="机场">'+escapeHTML(row.node.provider||row.node.providerId)+'</td><td class="info-cell" data-label="协议">'+escapeHTML(row.node.protocol)+'</td>'+metricCells+'</tr>'}).join('')+'</tbody></table></div>';
       document.querySelectorAll('[data-curve-node]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation();const row=lastOverview.find(item=>item.node&&item.node.id===btn.dataset.curveNode);openCurve(row).catch(err=>toast(err.message,true))}));
     }
     function renderProviders(providers,statuses){
       const counts={};(statuses||[]).forEach(s=>counts[s.id]=s.nodeCount||0);
-      $('providerEditor').innerHTML=providers.length?providers.map((p,i)=>'<div class="editor-card" data-provider-index="'+i+'" data-provider-category="'+escapeHTML(p.category||'')+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(p.name||p.id)+'</div><div class="editor-sub">'+escapeHTML(p.id||'')+' · 节点 '+Number(counts[p.id]||0)+'</div></div><div class="inline-actions"><button class="btn" data-edit-sub="'+i+'">订阅内容</button><button class="btn btn-danger" data-remove-provider="'+i+'">删除</button></div></div><div class="form-grid"><div class="field"><label>ID</label><input data-provider-field="id" value="'+escapeHTML(p.id||'')+'"></div><div class="field"><label>名称</label><input data-provider-field="name" value="'+escapeHTML(p.name||'')+'"></div><div class="field"><label>本地订阅文件</label><input data-provider-field="subscriptionFile" value="'+escapeHTML(p.subscriptionFile||'')+'"></div><div class="field" style="grid-column:1/-1"><label>订阅链接</label><input data-provider-field="subscriptionUrl" value="'+escapeHTML(p.subscriptionUrl||'')+'"></div></div></div>').join(''):'<div class="empty">还没有机场订阅。</div>';
+      $('providerEditor').innerHTML=providers.length?providers.map((p,i)=>'<div class="editor-card" data-provider-index="'+i+'" data-provider-category="'+escapeHTML(p.category||'')+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(p.name||p.id)+'</div><div class="editor-sub">'+escapeHTML(p.id||'')+' · 节点 '+Number(counts[p.id]||0)+'</div></div><div class="inline-actions"><button class="btn" data-refresh-provider="'+i+'">刷新</button><button class="btn" data-edit-sub="'+i+'">订阅内容</button><button class="btn btn-danger" data-remove-provider="'+i+'">删除</button></div></div><div class="form-grid"><div class="field"><label>ID</label><input data-provider-field="id" value="'+escapeHTML(p.id||'')+'"></div><div class="field"><label>名称</label><input data-provider-field="name" value="'+escapeHTML(p.name||'')+'"></div><div class="field"><label>本地订阅文件</label><input data-provider-field="subscriptionFile" value="'+escapeHTML(p.subscriptionFile||'')+'"></div><div class="field" style="grid-column:1/-1"><label>订阅链接</label><input data-provider-field="subscriptionUrl" value="'+escapeHTML(p.subscriptionUrl||'')+'"></div></div></div>').join(''):'<div class="empty">还没有机场订阅。</div>';
+      document.querySelectorAll('[data-refresh-provider]').forEach(btn=>btn.addEventListener('click',()=>refreshProvider(Number(btn.dataset.refreshProvider),btn).catch(e=>toast(e.message,true))));
       document.querySelectorAll('[data-edit-sub]').forEach(btn=>btn.addEventListener('click',()=>openSubscriptionEditor(Number(btn.dataset.editSub))));
       document.querySelectorAll('[data-remove-provider]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();const removed=adminConfig.providers.splice(Number(btn.dataset.removeProvider),1)[0];if(removed&&removed.id===activeSubProviderId)closeSubscriptionEditor();renderProviders(adminConfig.providers,statuses)}));
       document.querySelectorAll('[data-provider-field]').forEach(el=>el.addEventListener('input',markSettingsDirty));
+    }
+    async function refreshProvider(index,button){
+      const provider=collectProviders()[index];
+      if(!provider||!provider.id){toast('请先填写机场 ID',true);return}
+      if(settingsDirty)await saveConfig({providers:collectProviders()},{refresh:false,silent:true,reload:false});
+      if(button)button.disabled=true;
+      try{
+        const q=new URLSearchParams({id:provider.id});
+        const data=await apiJSON('/api/providers/refresh?'+q.toString(),{method:'POST'});
+        toast((provider.name||provider.id)+' 已刷新 · 节点 '+Number(data.nodeCount||0));
+        await load();
+      }finally{
+        if(button)button.disabled=false;
+      }
     }
     function renderAgentEditor(agents,statuses){
       $('agentEditor').innerHTML=agents.length?agents.map((a,i)=>'<div class="editor-card" data-agent-index="'+i+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(a.name||a.id)+'</div><div class="editor-sub">'+escapeHTML(a.id||'')+' · '+escapeHTML(a.probeSource||'-')+'</div></div><button class="btn btn-danger" data-remove-agent="'+i+'">删除</button></div><div class="form-grid"><div class="field"><label>Agent ID</label><input data-agent-field="id" value="'+escapeHTML(a.id||'')+'"></div><div class="field"><label>显示名</label><input data-agent-field="name" value="'+escapeHTML(a.name||'')+'"></div><div class="field"><label>地区 / 探测源</label><input data-agent-field="probeSource" value="'+escapeHTML(a.probeSource||'')+'"></div><div class="field"><label>运营商</label><select data-agent-field="carrier">'+carrierOptions(a.carrier||'unknown')+'</select></div></div></div>').join(''):'<div class="empty">还没有配置 Agent。</div>';
@@ -896,11 +930,18 @@
     function collectProviders(){return Array.from(document.querySelectorAll('[data-provider-index]')).map(card=>{const get=f=>card.querySelector('[data-provider-field="'+f+'"]').value.trim();const id=get('id'), name=get('name');return{id,name,category:name||id||card.dataset.providerCategory||'默认',subscriptionUrl:get('subscriptionUrl'),subscriptionFile:get('subscriptionFile')}})}
     function collectAgents(){return Array.from(document.querySelectorAll('[data-agent-index]')).map(card=>{const get=f=>card.querySelector('[data-agent-field="'+f+'"]');return{id:get('id').value.trim(),name:get('name').value.trim(),probeSource:get('probeSource').value.trim(),carrier:get('carrier').value}})}
     function collectProbe(){return{intervalSeconds:Number($('probeInterval').value)||300,timeoutSeconds:Number($('probeTimeout').value)||5,attempts:Number($('probeAttempts').value)||1,maxConcurrency:Number($('probeConcurrency').value)||16,tlsMode:$('probeTLS').value||'auto'}}
-    async function saveConfig(partial){
+    async function saveConfig(partial,options={}){
       const payload={agentReportTtl:Number($('agentTTL').value)||adminConfig.agentReportTtl||900,agents:partial.agents||collectAgents(),providers:partial.providers||collectProviders(),probe:partial.probe||collectProbe()};
       const token=$('agentToken').value.trim();if(token)payload.agentToken=token;
-      const res=await apiJSON('/api/admin/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      if(res.error)throw new Error(res.error);settingsDirty=false;if(res.refreshError)toast('配置已保存，订阅刷新失败：'+res.refreshError,true);else toast('配置已保存');$('agentToken').value='';await load();if(settingsOpen())loadInstallCommand().catch(console.error);
+      const url='/api/admin/config'+(options.refresh===false?'?refresh=0':'');
+      const res=await apiJSON(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      if(res.error)throw new Error(res.error);
+      settingsDirty=false;
+      if(res.config)adminConfig=res.config;
+      if(!options.silent){if(res.refreshError)toast('配置已保存，订阅刷新失败：'+res.refreshError,true);else toast('配置已保存')}
+      $('agentToken').value='';
+      if(options.reload!==false){await load();if(settingsOpen())loadInstallCommand().catch(console.error)}
+      return res;
     }
     function providerByActiveId(){return (adminConfig.providers||[]).find(p=>p.id===activeSubProviderId)}
     function closeSubscriptionEditor(){activeSubProviderId='';$('subscriptionWorkbench').style.display='none';$('subscriptionContent').value=''}
@@ -916,7 +957,7 @@
     }
     async function ensureProviderConfigSaved(){
       if(settingsDirty){
-        await saveConfig({providers:collectProviders()});
+        await saveConfig({providers:collectProviders()},{refresh:false,silent:true,reload:false});
       }
     }
     async function loadProviderSubscription(remote){
