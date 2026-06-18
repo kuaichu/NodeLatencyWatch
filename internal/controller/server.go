@@ -569,6 +569,10 @@ func (s *Server) agentStatuses(includeUnconfigured bool) []agentAdminStatus {
 	reports, _ := s.store.AgentReports(0)
 	byID := make(map[string]model.AgentReport, len(reports))
 	for _, report := range reports {
+		if invalidAgentIdentity(report.AgentID) {
+			_ = s.store.DeleteAgentReport(report.AgentID)
+			continue
+		}
 		current, ok := byID[report.AgentID]
 		if !ok || report.FinishedAt.After(current.FinishedAt) {
 			byID[report.AgentID] = report
@@ -692,6 +696,10 @@ func (s *Server) handleAgentReports(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(report.AgentID) == "" {
 		writeJSON(w, map[string]string{"error": "agentId is required"})
+		return
+	}
+	if invalidAgentIdentity(report.AgentID) {
+		writeJSON(w, map[string]string{"error": "agentId still contains a hostname placeholder; reinstall the agent with the latest install command"})
 		return
 	}
 	peer := s.peerForAgent(report.AgentID)
@@ -976,6 +984,11 @@ func shellValue(value string, dynamic bool) string {
 func isHostnamePlaceholder(value string) bool {
 	value = strings.TrimSpace(value)
 	return value == "agent-$(hostname)" || value == "agent-$(hostname -s)" || value == "$(hostname)" || value == "$(hostname -s)"
+}
+
+func invalidAgentIdentity(value string) bool {
+	value = strings.TrimSpace(value)
+	return value == "" || isHostnamePlaceholder(value) || strings.Contains(value, "$(")
 }
 
 func agentInstallScript() string {

@@ -175,6 +175,11 @@ func (s *Store) UpsertAgentReport(report model.AgentReport) error {
 	return err
 }
 
+func (s *Store) DeleteAgentReport(agentID string) error {
+	_, err := s.db.Exec(`DELETE FROM agent_reports WHERE agent_id = ?`, agentID)
+	return err
+}
+
 func (s *Store) AgentReports(ttl time.Duration) ([]model.AgentReport, error) {
 	query := `SELECT report_json FROM agent_reports`
 	args := []any{}
