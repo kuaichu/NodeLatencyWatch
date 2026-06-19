@@ -935,7 +935,7 @@
     async function saveConfig(partial,options={}){
       const payload={agentReportTtl:Number($('agentTTL').value)||adminConfig.agentReportTtl||900,agents:partial.agents||collectAgents(),providers:partial.providers||collectProviders(),probe:partial.probe||collectProbe()};
       const token=$('agentToken').value.trim();if(token)payload.agentToken=token;
-      const url='/api/admin/config'+(options.refresh===false?'?refresh=0':'');
+      const url='/api/admin/config'+(options.refresh===true?'':'?refresh=0');
       const res=await apiJSON(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
       if(res.error)throw new Error(res.error);
       settingsDirty=false;
