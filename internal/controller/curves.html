@@ -72,6 +72,15 @@
     .tool-action.primary{border-color:rgba(32,214,162,.32);background:rgba(32,214,162,.12);color:#dffcf2}
     .search{height:34px;min-width:210px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:#071018;color:#dceaf0;padding:0 13px;font:12px var(--mono)}
     .search:focus{outline:none;border-color:rgba(105,183,255,.45);box-shadow:0 0 0 3px rgba(105,183,255,.1)}
+    .source-panel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:-2px 0 14px;padding:10px 12px;border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.025)}
+    .source-label{color:#788e9c;font-size:12px;font-weight:850;letter-spacing:0;white-space:nowrap}
+    .source-rail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+    .source-chip{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:0 11px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.04);color:#d9eaf1;font-size:12px;font-weight:850;cursor:pointer;transition:transform .18s ease,border-color .18s ease,background .18s ease,opacity .18s ease}
+    .source-chip:hover{transform:translateY(-1px);border-color:rgba(132,162,184,.3)}
+    .source-chip.off{opacity:.48;background:rgba(5,13,20,.42);color:#8da1ad}
+    .source-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 16px currentColor}
+    .source-name{min-width:0;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .source-count{color:#708694;font-family:var(--mono);font-size:11px}.source-chip:not(.off) .source-count{color:#b5cbd7}
     .node-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-height:390px;overflow:auto;border:1px solid rgba(132,162,184,.14);border-radius:18px;background:rgba(255,255,255,.025);margin-bottom:18px}
     .node-grid::-webkit-scrollbar{width:9px;height:9px}.node-grid::-webkit-scrollbar-thumb{border-radius:999px;background:rgba(132,162,184,.24)}.node-grid::-webkit-scrollbar-track{background:rgba(255,255,255,.025)}
     .node-tile{min-height:136px;padding:15px 16px;border-right:1px solid rgba(132,162,184,.12);border-bottom:1px solid rgba(132,162,184,.12);background:rgba(255,255,255,.018);text-align:left;cursor:pointer;transition:.18s ease}
@@ -109,6 +118,7 @@
       .rail{flex-wrap:nowrap;overflow-x:auto;margin:0 -8px;padding:0 8px 4px;-webkit-overflow-scrolling:touch}.rail::-webkit-scrollbar{display:none}.chip{flex:0 0 auto}
       .panel{border-radius:18px}.board{padding:14px}.board-title{font-size:20px}.summary-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
       .tools{display:grid;grid-template-columns:1fr;align-items:stretch;gap:8px}.tool-group{justify-content:center}.tool-action,.search{width:100%;height:38px}
+      .source-panel{align-items:flex-start}.source-rail{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}.source-rail::-webkit-scrollbar{display:none}.source-chip{flex:0 0 auto}.source-name{max-width:180px}
       .node-grid{display:grid;grid-template-columns:1fr;max-height:none;overflow:visible;border:0;border-radius:0;background:transparent;gap:10px}.node-tile,.node-tile:nth-child(3n),.node-tile:nth-child(4n){border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.035)}
       .chart{height:320px}.chart-toolbar{display:grid}.legend{max-height:128px;overflow:auto}.toast{left:8px;right:8px;bottom:10px;text-align:center}
     }
@@ -167,6 +177,11 @@
         <input class="search" id="searchInput" placeholder="搜索节点 / 机场 / 协议">
       </div>
 
+      <div class="source-panel" id="sourcePanel">
+        <span class="source-label">探测源</span>
+        <div class="source-rail" id="sourceRail"></div>
+      </div>
+
       <div id="nodeGrid" class="node-grid"></div>
 
       <div class="chart-wrap">
@@ -207,7 +222,7 @@
     const metricInfo={rtt:{label:'RTT',unit:'ms'},http:{label:'HTTP',unit:'ms'},jitter:{label:'抖动',unit:'ms'},loss:{label:'丢包',unit:'%'}};
     const palette=['#2f7dff','#ee4f9a','#ff9f2e','#b85cff','#20d6a2','#40d7d3','#5a8dee','#7447d8','#d346a4','#69b7ff','#f4c95d','#ff6b6b','#74d680','#c087ff','#ff7ec2','#5ce1ff'];
     const $=id=>document.getElementById(id);
-    let adminConfig=null, lastStatus=null, overview=[], agents=[], providers=[], selectedProvider='all', selectedCountry='all', selectedNodeId='', metric='rtt', hours=24, despike=true, keyword='', selectionTouched=false;
+    let adminConfig=null, lastStatus=null, overview=[], agents=[], providers=[], selectedProvider='all', selectedCountry='all', selectedNodeId='', metric='rtt', hours=24, despike=true, keyword='', selectionTouched=false, hiddenSources=new Set();
     const sampleCache=new Map(), loadingNodes=new Set();
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
@@ -253,6 +268,29 @@
       return Array.from(byCode.values()).sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans-CN'));
     }
     function sampleCarrierKey(sample){return sample.carrier||sample.agentId||'unknown'}
+    function sourceKeyForAgent(agent){return 'agent:'+String(agent&&agent.id||'unknown')}
+    function sourceKeyForSample(sample){
+      const id=String(sample&&sample.agentId||'').trim();
+      if(id)return 'agent:'+id;
+      return 'carrier:'+String(sampleCarrierKey(sample)||'unknown').trim();
+    }
+    function sourceAgentID(key){const text=String(key||'');return text.startsWith('agent:')?text.slice(6):''}
+    function sourceLabelForKey(key,sample){
+      const agentID=sourceAgentID(key);
+      if(agentID)return agentDisplayName(agentID,sample);
+      return (sample&&(sample.probeSource||sample.agentName||sample.carrierLabel||sample.carrier))||String(key||'未知探测源').replace(/^carrier:/,'');
+    }
+    function sourceSortIndex(key){
+      const agentID=sourceAgentID(key);
+      if(agentID)return agentSortIndex(agentID);
+      return 9999;
+    }
+    function sourceColor(key){
+      let hash=0, text=String(key||'');
+      for(let i=0;i<text.length;i++)hash=((hash<<5)-hash)+text.charCodeAt(i);
+      return palette[Math.abs(hash)%palette.length];
+    }
+    function sourceVisible(sample){return !hiddenSources.has(sourceKeyForSample(sample))}
     function sampleValue(sample,key=metric){
       if(!sample)return null;
       if(key==='loss')return Number(sample.lossRate||0);
@@ -279,7 +317,7 @@
       if(metric==='loss')return value>50?'bad':value>0?'warn':'';
       return value>800?'bad':value>300?'warn':'';
     }
-    function orderedLatestSamples(row){
+    function orderedAllLatestSamples(row){
       const list=(row&&row.latest)||[], used=new Set(), out=[];
       const byAgent=new Map();
       list.forEach(sample=>{if(sample.agentId)byAgent.set(sample.agentId,sample)});
@@ -290,6 +328,25 @@
       });
       list.forEach(sample=>{if(!used.has(sample))out.push(sample)});
       return out;
+    }
+    function sourcesForRows(rows){
+      const map=new Map();
+      function add(key,label,order){
+        if(!key)return null;
+        if(!map.has(key))map.set(key,{key,label:label||'未知探测源',order,count:0});
+        const item=map.get(key);
+        if(label)item.label=label;
+        item.order=Math.min(item.order,order);
+        return item;
+      }
+      visibleAgents().forEach((agent,index)=>add(sourceKeyForAgent(agent),agentDisplayName(agent.id),index));
+      (rows||[]).forEach(row=>{
+        orderedAllLatestSamples(row).forEach(sample=>{
+          const key=sourceKeyForSample(sample), item=add(key,sourceLabelForKey(key,sample),sourceSortIndex(key));
+          if(item)item.count+=1;
+        });
+      });
+      return Array.from(map.values()).filter(item=>item.count>0).sort((a,b)=>a.order-b.order||a.label.localeCompare(b.label,'zh-Hans-CN'));
     }
     function rowsBeforeCountry(){
       return (overview||[])
@@ -358,6 +415,7 @@
       const rows=scopedRows();
       ensureSelection(rows);
       renderTools();
+      renderSourceRail(rows);
       renderSummary(status,rows);
       renderNodeGrid(rows);
       renderChart();
@@ -378,6 +436,24 @@
       $('despikeBtn').classList.toggle('primary',despike);
       $('searchInput').value=keyword;
     }
+    function renderSourceRail(rows){
+      const panel=$('sourcePanel'), rail=$('sourceRail'), sources=sourcesForRows(rows);
+      if(!sources.length){panel.style.display='none';rail.innerHTML='';return}
+      panel.style.display='';
+      rail.innerHTML=sources.map(source=>{
+        const hidden=hiddenSources.has(source.key), color=sourceColor(source.key);
+        return '<button class="source-chip '+(hidden?'off':'')+'" data-source="'+escapeHTML(source.key)+'" aria-pressed="'+(!hidden)+'" title="'+escapeHTML(hidden?'点击显示':'点击隐藏')+' '+escapeHTML(source.label)+'">'+
+          '<span class="source-dot" style="background:'+color+';color:'+color+'"></span>'+
+          '<span class="source-name">'+escapeHTML(source.label)+'</span>'+
+          '<span class="source-count">'+Number(source.count||0)+'</span>'+
+        '</button>';
+      }).join('');
+      document.querySelectorAll('[data-source]').forEach(btn=>btn.addEventListener('click',()=>{
+        const key=btn.dataset.source;
+        if(hiddenSources.has(key))hiddenSources.delete(key);else hiddenSources.add(key);
+        renderAll(lastStatus||{});
+      }));
+    }
     function renderAfterScopeChange(){
       const rows=scopedRows();
       ensureSelection(rows);
@@ -388,7 +464,8 @@
       const selected=selectedNodeId&&rows.some(row=>row.node.id===selectedNodeId)?1:0;
       $('scopeTitle').textContent=(selectedProvider==='all'?'全部机场':providerLabel(selectedProvider));
       const row=selectedRow();
-      $('scopeSub').textContent=metricInfo[metric].label+' · 当前节点 '+(row?cleanNodeName(row.node.name):'未选择')+' · 节点卡按探测源顺序展示';
+      const sources=sourcesForRows(rows), visibleSources=sources.filter(source=>!hiddenSources.has(source.key)).length;
+      $('scopeSub').textContent=metricInfo[metric].label+' · 当前节点 '+(row?cleanNodeName(row.node.name):'未选择')+' · 显示 '+visibleSources+'/'+sources.length+' 个探测源，开关同步控制节点卡和曲线';
       $('visibleCount').textContent=rows.length;
       $('selectedCount').textContent=selected;
       $('hoursCount').textContent=hours>=720?'30d':hours>=168?'7d':'24h';
@@ -397,8 +474,10 @@
     function renderNodeGrid(rows){
       if(!rows.length){$('nodeGrid').innerHTML='<div class="empty" style="grid-column:1/-1">当前筛选下没有可用节点。</div>';return}
       $('nodeGrid').innerHTML=rows.map(row=>{
-        const samples=orderedLatestSamples(row), n=row.node||{}, active=selectedNodeId===n.id, country=countryForRow(row);
-        const metrics=samples.length?samples.map(sample=>{const value=sampleValue(sample), cls=valueClass(value,sample);return'<div class="node-agent-row"><span>'+escapeHTML(agentDisplayName(sample.agentId,sample))+'</span><strong class="'+cls+'">'+escapeHTML(fmtMetric(value))+'</strong></div>'}).join(''):'<div class="node-agent-row"><span>暂无探测源</span><strong class="bad">无数据</strong></div>';
+        const rawSamples=orderedAllLatestSamples(row), samples=rawSamples.filter(sourceVisible), n=row.node||{}, active=selectedNodeId===n.id, country=countryForRow(row);
+        const emptyLabel=rawSamples.length?'探测源已隐藏':'暂无探测源';
+        const emptyValue=rawSamples.length?'已隐藏':'无数据';
+        const metrics=samples.length?samples.map(sample=>{const value=sampleValue(sample), cls=valueClass(value,sample);return'<div class="node-agent-row"><span>'+escapeHTML(agentDisplayName(sample.agentId,sample))+'</span><strong class="'+cls+'">'+escapeHTML(fmtMetric(value))+'</strong></div>'}).join(''):'<div class="node-agent-row"><span>'+escapeHTML(emptyLabel)+'</span><strong class="bad">'+escapeHTML(emptyValue)+'</strong></div>';
         return '<button class="node-tile '+(active?'active':'')+'" data-node="'+escapeHTML(n.id)+'">'+
           '<div class="node-name">'+flagHTML(country)+'<span>'+escapeHTML(cleanNodeName(n.name||n.id))+'</span></div>'+
           '<div class="node-provider">'+escapeHTML(n.provider||n.providerId||'-')+' · '+escapeHTML(n.protocol||'-')+'</div>'+
@@ -424,15 +503,16 @@
       const samples=sampleCache.get(cacheKey(row.node.id))||[];
       const groups=new Map();
       samples.forEach(sample=>{
-        const key=sample.agentId||sampleCarrierKey(sample);
+        const key=sourceKeyForSample(sample);
+        if(hiddenSources.has(key))return;
         if(!groups.has(key))groups.set(key,[]);
         groups.get(key).push(sample);
       });
       groups.forEach((list,key)=>{
-        const first=list[0]||{agentId:key};
-        const label=agentDisplayName(first.agentId||key,first);
+        const first=list[0]||{};
+        const label=sourceLabelForKey(key,first);
         const records=list.map(sample=>({time:new Date(sample.time).getTime(),value:sampleValue(sample),success:sample.success})).filter(item=>Number.isFinite(item.time)).sort((a,b)=>a.time-b.time);
-        out.push({key,node:row.node,label,records,latest:list[list.length-1],order:agentSortIndex(first.agentId||key)});
+        out.push({key,node:row.node,label,records,latest:list[list.length-1],order:sourceSortIndex(key)});
       });
       return out.sort((a,b)=>a.order-b.order||a.label.localeCompare(b.label,'zh-Hans-CN'));
     }
@@ -464,12 +544,13 @@
     function linePath(points){return points.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}
     function renderChart(){
       const row=selectedRow(), loading=selectedNodeId&&loadingNodes.has(selectedNodeId), series=seriesForChart(), chartEl=$('curveChart'), chartWidth=Math.round(chartEl.clientWidth||1100), compact=chartWidth<640;
-      series.forEach((item,i)=>item.color=palette[i%palette.length]);
+      series.forEach(item=>item.color=sourceColor(item.key));
       $('selectedCount').textContent=row?'1':'0';
       $('seriesCount').textContent=series.length;
       $('chartHint').textContent=(loading?'正在加载...':'已加载')+' · '+(row?cleanNodeName(row.node.name):'未选择节点')+' · '+series.length+' 条曲线 · '+metricInfo[metric].label+(despike&&metric!=='loss'?' · 消峰':'');
       if(!row){chartEl.innerHTML='<div class="empty">还没有选择节点。</div>';$('curveLegend').innerHTML='';return}
       if(loading&&!series.some(s=>s.records.length)){chartEl.innerHTML='<div class="empty">正在加载曲线样本...</div>';$('curveLegend').innerHTML='';return}
+      if(!series.length&&sourcesForRows([row]).some(source=>hiddenSources.has(source.key))){chartEl.innerHTML='<div class="empty">当前探测源都已隐藏。</div>';$('curveLegend').innerHTML='';return}
       const width=compact?Math.max(360,chartWidth):1160, height=compact?320:430, left=compact?64:64, right=compact?18:26, top=compact?24:28, bottom=compact?54:48;
       const allTimes=series.flatMap(s=>s.records.map(r=>r.time)).filter(Number.isFinite);
       const values=series.flatMap(s=>s.records.map(r=>r.value)).filter(value=>value!==null&&Number.isFinite(value));
