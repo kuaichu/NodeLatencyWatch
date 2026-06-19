@@ -72,22 +72,19 @@
     .tool-action.primary{border-color:rgba(32,214,162,.32);background:rgba(32,214,162,.12);color:#dffcf2}
     .search{height:34px;min-width:210px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:#071018;color:#dceaf0;padding:0 13px;font:12px var(--mono)}
     .search:focus{outline:none;border-color:rgba(105,183,255,.45);box-shadow:0 0 0 3px rgba(105,183,255,.1)}
-    .series-rail{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border:1px solid rgba(132,162,184,.12);border-radius:16px;background:rgba(255,255,255,.025)}
-    .series-chip{display:inline-flex;align-items:center;gap:7px;min-height:30px;padding:0 10px;border:1px solid rgba(132,162,184,.16);border-radius:999px;background:rgba(255,255,255,.04);color:#9eb0bc;font-size:12px;font-weight:850;cursor:pointer}
-    .series-chip:not(.active){opacity:.45;filter:saturate(.4)}
-    .series-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
     .node-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));max-height:390px;overflow:auto;border:1px solid rgba(132,162,184,.14);border-radius:18px;background:rgba(255,255,255,.025);margin-bottom:18px}
     .node-grid::-webkit-scrollbar{width:9px;height:9px}.node-grid::-webkit-scrollbar-thumb{border-radius:999px;background:rgba(132,162,184,.24)}.node-grid::-webkit-scrollbar-track{background:rgba(255,255,255,.025)}
-    .node-tile{min-height:116px;padding:15px 16px;border-right:1px solid rgba(132,162,184,.12);border-bottom:1px solid rgba(132,162,184,.12);background:rgba(255,255,255,.018);text-align:left;cursor:pointer;transition:.18s ease}
+    .node-tile{min-height:136px;padding:15px 16px;border-right:1px solid rgba(132,162,184,.12);border-bottom:1px solid rgba(132,162,184,.12);background:rgba(255,255,255,.018);text-align:left;cursor:pointer;transition:.18s ease}
     .node-tile:nth-child(4n){border-right:0}
     .node-tile:hover{background:rgba(105,183,255,.06)}
     .node-tile.active{background:linear-gradient(145deg,rgba(32,214,162,.16),rgba(105,183,255,.06));box-shadow:inset 0 0 0 1px rgba(32,214,162,.34)}
     .node-name{display:flex;align-items:center;gap:7px;min-width:0;color:#dceaf2;font-size:13px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .node-name span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
     .node-provider{margin-top:6px;color:#728692;font-size:11px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .node-value{margin-top:10px;font-family:var(--mono);font-size:25px;font-weight:900;line-height:1}
-    .node-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;color:#9badb8;font-size:12px;font-family:var(--mono)}
-    .node-meta .bad{color:#ffc7c7}.node-meta .warn{color:#f4d98f}
+    .node-agent-list{display:grid;gap:6px;margin-top:11px}
+    .node-agent-row{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:24px;padding:4px 7px;border-radius:8px;background:rgba(255,255,255,.04);font-family:var(--mono)}
+    .node-agent-row span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#91a7b4;font-size:11px}
+    .node-agent-row strong{flex:0 0 auto;color:#dffcf2;font-size:12px;font-weight:900}.node-agent-row strong.warn{color:#f4d98f}.node-agent-row strong.bad{color:#ffc7c7}
     .empty{color:var(--muted);padding:28px;text-align:center;border:1px dashed rgba(132,162,184,.22);border-radius:18px;background:rgba(255,255,255,.025)}
     .chart-wrap{position:relative;border:1px solid rgba(132,162,184,.14);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.018));overflow:hidden}
     .chart-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid rgba(132,162,184,.12);color:#8da3b0;font-size:12px}
@@ -111,7 +108,7 @@
       .top-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.top-actions .pill{grid-column:1/-1;justify-content:center;min-height:34px;font-size:12px}.top-actions .btn{justify-content:center;min-height:36px;padding:0 10px;font-size:12px}
       .rail{flex-wrap:nowrap;overflow-x:auto;margin:0 -8px;padding:0 8px 4px;-webkit-overflow-scrolling:touch}.rail::-webkit-scrollbar{display:none}.chip{flex:0 0 auto}
       .panel{border-radius:18px}.board{padding:14px}.board-title{font-size:20px}.summary-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-      .tools{display:grid;grid-template-columns:1fr;align-items:stretch;gap:8px}.tool-group{justify-content:center}.tool-action,.search{width:100%;height:38px}.series-rail{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}.series-rail::-webkit-scrollbar{display:none}.series-chip{flex:0 0 auto}
+      .tools{display:grid;grid-template-columns:1fr;align-items:stretch;gap:8px}.tool-group{justify-content:center}.tool-action,.search{width:100%;height:38px}
       .node-grid{display:grid;grid-template-columns:1fr;max-height:none;overflow:visible;border:0;border-radius:0;background:transparent;gap:10px}.node-tile,.node-tile:nth-child(3n),.node-tile:nth-child(4n){border:1px solid rgba(132,162,184,.14);border-radius:16px;background:rgba(255,255,255,.035)}
       .chart{height:320px}.chart-toolbar{display:grid}.legend{max-height:128px;overflow:auto}.toast{left:8px;right:8px;bottom:10px;text-align:center}
     }
@@ -168,12 +165,10 @@
           <button class="tool-btn" data-metric="loss">丢包</button>
         </div>
         <button class="tool-action primary" id="despikeBtn">消峰 开</button>
-        <button class="tool-action" id="resetSeriesBtn">显示全部线路</button>
         <input class="search" id="searchInput" placeholder="搜索节点 / 机场 / 协议">
       </div>
 
       <div id="nodeGrid" class="node-grid"></div>
-      <div id="seriesRail" class="series-rail"></div>
 
       <div class="chart-wrap">
         <div class="chart-toolbar">
@@ -188,7 +183,6 @@
   <div class="toast" id="toast"></div>
 
   <script>
-    const carriers=[['telecom','中国电信'],['unicom','中国联通'],['mobile','中国移动'],['unknown','未知线路']];
     const countries=[
       {code:'hk',flag:'HK',label:'香港',patterns:[/hong\s*kong/i,/hongkong/i,/香港/i,/(^|[\s._-])hk\d*($|[\s._-])/i,/(^|[\s._-])hkg\d*($|[\s._-])/i]},
       {code:'tw',flag:'TW',label:'台湾',patterns:[/taiwan/i,/台湾/i,/臺灣/i,/(^|[\s._-])(tw|twn)\d*($|[\s._-])/i]},
@@ -215,12 +209,17 @@
     const palette=['#2f7dff','#ee4f9a','#ff9f2e','#b85cff','#20d6a2','#40d7d3','#5a8dee','#7447d8','#d346a4','#69b7ff','#f4c95d','#ff6b6b','#74d680','#c087ff','#ff7ec2','#5ce1ff'];
     const $=id=>document.getElementById(id);
     let adminConfig=null, lastStatus=null, overview=[], agents=[], providers=[], selectedProvider='all', selectedCountry='all', selectedAgent='all', selectedNodeId='', metric='rtt', hours=24, despike=true, keyword='', selectionTouched=false;
-    const hiddenSeries=new Set(), sampleCache=new Map(), loadingNodes=new Set();
+    const sampleCache=new Map(), loadingNodes=new Set();
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
     async function apiJSON(url,options){const resp=await fetch(url,options);if(!resp.ok)throw new Error(await resp.text()||resp.statusText);const data=await resp.json();if(data&&data.error)throw new Error(data.error);return data}
-    function carrierLabel(value){const found=carriers.find(c=>c[0]===value);return found?found[1]:(value||'未知线路')}
     function agentLabel(agent){return agent?(agent.name||agent.id||'未知机子'):'全部机子'}
+    function agentById(id){return agents.find(agent=>agent.id===id)||(adminConfig&&adminConfig.agents||[]).find(agent=>agent.id===id)||null}
+    function agentDisplayName(id,sample){
+      const agent=agentById(id);
+      return (agent&&(agent.probeSource||agent.name||agent.id))||(sample&&(sample.probeSource||sample.agentName||sample.agentId))||id||'未知探测源';
+    }
+    function agentSortIndex(id){const index=visibleAgents().findIndex(agent=>agent.id===id);return index>=0?index:9999}
     function activeAgent(){return selectedAgent==='all'?null:agents.find(agent=>agent.id===selectedAgent)}
     function activeAgentLabel(){return selectedAgent==='all'?'全部机子':agentLabel(activeAgent())}
     function providerKeyForRow(row){const n=row&&row.node?row.node:{};return n.providerId||n.provider||'unknown'}
@@ -258,7 +257,6 @@
       return Array.from(byCode.values()).sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans-CN'));
     }
     function sampleCarrierKey(sample){return sample.carrier||sample.agentId||'unknown'}
-    function sampleCarrierName(sample){return sample.carrierLabel||carrierLabel(sample.carrier)||sample.agentName||sampleCarrierKey(sample)}
     function sampleValue(sample,key=metric){
       if(!sample)return null;
       if(key==='loss')return Number(sample.lossRate||0);
@@ -280,6 +278,23 @@
     }
     function bestSample(list){return (list||[]).slice().sort((a,b)=>sampleScore(a)-sampleScore(b))[0]}
     function visibleAgents(){return (agents||[]).filter(agent=>agent.configured&&agent.lastSeen&&!String(agent.lastSeen).startsWith('0001'))}
+    function valueClass(value,sample){
+      if(!sample||!sample.success)return'bad';
+      if(metric==='loss')return value>50?'bad':value>0?'warn':'';
+      return value>800?'bad':value>300?'warn':'';
+    }
+    function orderedLatestSamples(row){
+      const list=(row&&row.latest)||[], used=new Set(), out=[];
+      const byAgent=new Map();
+      list.forEach(sample=>{if(sample.agentId)byAgent.set(sample.agentId,sample)});
+      const orderedAgents=selectedAgent==='all'?visibleAgents():visibleAgents().filter(agent=>agent.id===selectedAgent);
+      orderedAgents.forEach(agent=>{
+        const sample=byAgent.get(agent.id);
+        if(sample){out.push(sample);used.add(sample)}
+      });
+      list.forEach(sample=>{if(!used.has(sample)&&(selectedAgent==='all'||sample.agentId===selectedAgent))out.push(sample)});
+      return out;
+    }
     function rowsBeforeCountry(){
       return (overview||[]).map(row=>selectedAgent==='all'?row:{...row,latest:(row.latest||[]).filter(sample=>sample.agentId===selectedAgent)})
         .filter(row=>selectedProvider==='all'||providerKeyForRow(row)===selectedProvider)
@@ -303,8 +318,8 @@
     }
     function ensureSelection(rows){
       const valid=new Set(rows.map(row=>row.node.id));
-      if(selectedNodeId&&!valid.has(selectedNodeId)){selectedNodeId='';hiddenSeries.clear()}
-      if(!selectedNodeId&&!selectionTouched&&rows.length){selectedNodeId=rows[0].node.id;hiddenSeries.clear()}
+      if(selectedNodeId&&!valid.has(selectedNodeId))selectedNodeId='';
+      if(!selectedNodeId&&!selectionTouched&&rows.length)selectedNodeId=rows[0].node.id;
     }
     function limitForHours(){return hours>=720?8000:hours>=168?5000:2400}
     function cacheKey(nodeID){return nodeID+':'+hours}
@@ -355,14 +370,14 @@
     }
     function renderRails(){
       $('providerRail').innerHTML='<button class="chip '+(selectedProvider==='all'?'active':'')+'" data-provider="all">全部机场</button>'+providers.map(provider=>'<button class="chip '+(selectedProvider===provider.id?'active':'')+'" data-provider="'+escapeHTML(provider.id)+'">'+escapeHTML(provider.name)+'</button>').join('');
-      document.querySelectorAll('[data-provider]').forEach(btn=>btn.addEventListener('click',()=>{selectedProvider=btn.dataset.provider;selectionTouched=false;hiddenSeries.clear();renderAfterScopeChange()}));
+      document.querySelectorAll('[data-provider]').forEach(btn=>btn.addEventListener('click',()=>{selectedProvider=btn.dataset.provider;selectionTouched=false;renderAfterScopeChange()}));
       const countryRows=rowsBeforeCountry(), countryList=countriesForRows(countryRows);
       if(selectedCountry!=='all'&&!countryList.some(country=>country.code===selectedCountry))selectedCountry='all';
       $('countryRail').innerHTML='<button class="chip country-chip '+(selectedCountry==='all'?'active':'')+'" data-country="all">全部地区<span class="country-count">'+countryRows.length+'</span></button>'+countryList.map(country=>'<button class="chip country-chip '+(selectedCountry===country.code?'active':'')+'" data-country="'+escapeHTML(country.code)+'">'+flagHTML(country)+'<span>'+escapeHTML(country.label)+'</span><span class="country-count">'+Number(country.count||0)+'</span></button>').join('');
-      document.querySelectorAll('[data-country]').forEach(btn=>btn.addEventListener('click',()=>{selectedCountry=btn.dataset.country;selectionTouched=false;hiddenSeries.clear();renderAfterScopeChange()}));
+      document.querySelectorAll('[data-country]').forEach(btn=>btn.addEventListener('click',()=>{selectedCountry=btn.dataset.country;selectionTouched=false;renderAfterScopeChange()}));
       const list=visibleAgents();
       $('agentRail').innerHTML='<button class="chip '+(selectedAgent==='all'?'active':'')+'" data-agent="all">全部机子</button>'+list.map(agent=>'<button class="chip '+(selectedAgent===agent.id?'active':'')+'" data-agent="'+escapeHTML(agent.id)+'">'+escapeHTML(agentLabel(agent))+'</button>').join('');
-      document.querySelectorAll('[data-agent]').forEach(btn=>btn.addEventListener('click',()=>{selectedAgent=btn.dataset.agent;selectionTouched=false;hiddenSeries.clear();renderAfterScopeChange()}));
+      document.querySelectorAll('[data-agent]').forEach(btn=>btn.addEventListener('click',()=>{selectedAgent=btn.dataset.agent;selectionTouched=false;renderAfterScopeChange()}));
     }
     function renderTools(){
       document.querySelectorAll('[data-hours]').forEach(btn=>btn.classList.toggle('active',Number(btn.dataset.hours)===hours));
@@ -381,7 +396,7 @@
       const selected=selectedNodeId&&rows.some(row=>row.node.id===selectedNodeId)?1:0;
       $('scopeTitle').textContent=(selectedProvider==='all'?'全部机场':providerLabel(selectedProvider));
       const row=selectedRow();
-      $('scopeSub').textContent=activeAgentLabel()+' · '+metricInfo[metric].label+' · 当前节点 '+(row?cleanNodeName(row.node.name):'未选择')+' · 上方线路可单独开关';
+      $('scopeSub').textContent=activeAgentLabel()+' · '+metricInfo[metric].label+' · 当前节点 '+(row?cleanNodeName(row.node.name):'未选择')+' · 顶部机子筛选可单独查看探测源';
       $('visibleCount').textContent=rows.length;
       $('selectedCount').textContent=selected;
       $('hoursCount').textContent=hours>=720?'30d':hours>=168?'7d':'24h';
@@ -390,20 +405,17 @@
     function renderNodeGrid(rows){
       if(!rows.length){$('nodeGrid').innerHTML='<div class="empty" style="grid-column:1/-1">当前筛选下没有可用节点。</div>';return}
       $('nodeGrid').innerHTML=rows.map(row=>{
-        const sample=bestSample(row.latest||[]), value=sampleValue(sample), n=row.node||{}, active=selectedNodeId===n.id, country=countryForRow(row);
-        const loss=sample?Number(sample.lossRate||0):0, jitter=sample?Number(sample.rttStdDevMs||0):0;
-        const valueClass=!sample||!sample.success?'bad':value>800?'bad':value>300?'warn':'';
+        const samples=orderedLatestSamples(row), n=row.node||{}, active=selectedNodeId===n.id, country=countryForRow(row);
+        const metrics=samples.length?samples.map(sample=>{const value=sampleValue(sample), cls=valueClass(value,sample);return'<div class="node-agent-row"><span>'+escapeHTML(agentDisplayName(sample.agentId,sample))+'</span><strong class="'+cls+'">'+escapeHTML(fmtMetric(value))+'</strong></div>'}).join(''):'<div class="node-agent-row"><span>暂无探测源</span><strong class="bad">无数据</strong></div>';
         return '<button class="node-tile '+(active?'active':'')+'" data-node="'+escapeHTML(n.id)+'">'+
           '<div class="node-name">'+flagHTML(country)+'<span>'+escapeHTML(cleanNodeName(n.name||n.id))+'</span></div>'+
           '<div class="node-provider">'+escapeHTML(n.provider||n.providerId||'-')+' · '+escapeHTML(n.protocol||'-')+'</div>'+
-          '<div class="node-value '+valueClass+'">'+escapeHTML(fmtMetric(value))+'</div>'+
-          '<div class="node-meta"><span>'+escapeHTML(sample?sampleCarrierName(sample):'-')+'</span><span class="'+(loss>0?'warn':'')+'">丢包 '+loss.toFixed(0)+'%</span><span>抖动 '+jitter.toFixed(1)+'</span></div>'+
+          '<div class="node-agent-list">'+metrics+'</div>'+
         '</button>';
       }).join('');
       document.querySelectorAll('[data-node]').forEach(btn=>btn.addEventListener('click',()=>{
         const id=btn.dataset.node;
         selectedNodeId=id;
-        hiddenSeries.clear();
         selectionTouched=true;
         renderAll(lastStatus||{});
         loadSamplesForSelected().catch(e=>toast(e.message,true));
@@ -425,24 +437,12 @@
         groups.get(key).push(sample);
       });
       groups.forEach((list,key)=>{
-        const first=list[0]||{carrier:key}, label=[first.agentName||first.probeSource||sampleCarrierName(first), sampleCarrierName(first)].filter(Boolean).join(' · ');
+        const first=list[0]||{agentId:key};
+        const label=agentDisplayName(first.agentId||key,first);
         const records=list.map(sample=>({time:new Date(sample.time).getTime(),value:sampleValue(sample),success:sample.success})).filter(item=>Number.isFinite(item.time)).sort((a,b)=>a.time-b.time);
-        out.push({key,node:row.node,label,records,latest:list[list.length-1]});
+        out.push({key,node:row.node,label,records,latest:list[list.length-1],order:agentSortIndex(first.agentId||key)});
       });
-      return out.sort((a,b)=>a.label.localeCompare(b.label,'zh-Hans-CN'));
-    }
-    function visibleSeriesForChart(){
-      return seriesForChart().filter(series=>!hiddenSeries.has(series.key));
-    }
-    function renderSeriesRail(allSeries){
-      if(!selectedNodeId){$('seriesRail').innerHTML='<span class="empty" style="width:100%;padding:14px">先选择一个节点。</span>';return}
-      if(!allSeries.length){$('seriesRail').innerHTML='<span class="empty" style="width:100%;padding:14px">当前节点还没有可用的 Agent 曲线。</span>';return}
-      $('seriesRail').innerHTML=allSeries.map((series,i)=>'<button type="button" class="series-chip '+(!hiddenSeries.has(series.key)?'active':'')+'" data-series="'+escapeHTML(series.key)+'"><span class="series-dot" style="background:'+(series.color||palette[i%palette.length])+'"></span>'+escapeHTML(series.label)+'</button>').join('');
-      document.querySelectorAll('[data-series]').forEach(btn=>btn.addEventListener('click',()=>{
-        const key=btn.dataset.series;
-        if(hiddenSeries.has(key))hiddenSeries.delete(key);else hiddenSeries.add(key);
-        renderChart();
-      }));
+      return out.sort((a,b)=>a.order-b.order||a.label.localeCompare(b.label,'zh-Hans-CN'));
     }
     function percentileFloor(sortedValues,ratio){if(!sortedValues.length)return null;const index=Math.max(0,Math.min(sortedValues.length-1,Math.floor((sortedValues.length-1)*ratio)));return sortedValues[index]}
     function renderScale(values){
@@ -471,16 +471,13 @@
     }
     function linePath(points){return points.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}
     function renderChart(){
-      const row=selectedRow(), loading=selectedNodeId&&loadingNodes.has(selectedNodeId), allSeries=seriesForChart(), chartEl=$('curveChart'), chartWidth=Math.round(chartEl.clientWidth||1100), compact=chartWidth<640;
-      allSeries.forEach((series,i)=>series.color=palette[i%palette.length]);
-      const series=allSeries.filter(item=>!hiddenSeries.has(item.key));
-      renderSeriesRail(allSeries);
+      const row=selectedRow(), loading=selectedNodeId&&loadingNodes.has(selectedNodeId), series=seriesForChart(), chartEl=$('curveChart'), chartWidth=Math.round(chartEl.clientWidth||1100), compact=chartWidth<640;
+      series.forEach((item,i)=>item.color=palette[i%palette.length]);
       $('selectedCount').textContent=row?'1':'0';
       $('seriesCount').textContent=series.length;
-      $('chartHint').textContent=(loading?'正在加载...':'已加载')+' · '+(row?cleanNodeName(row.node.name):'未选择节点')+' · '+series.length+'/'+allSeries.length+' 条曲线 · '+metricInfo[metric].label+(despike&&metric!=='loss'?' · 消峰':'');
+      $('chartHint').textContent=(loading?'正在加载...':'已加载')+' · '+(row?cleanNodeName(row.node.name):'未选择节点')+' · '+series.length+' 条曲线 · '+metricInfo[metric].label+(despike&&metric!=='loss'?' · 消峰':'');
       if(!row){chartEl.innerHTML='<div class="empty">还没有选择节点。</div>';$('curveLegend').innerHTML='';return}
-      if(loading&&!allSeries.some(s=>s.records.length)){chartEl.innerHTML='<div class="empty">正在加载曲线样本...</div>';$('curveLegend').innerHTML='';return}
-      if(allSeries.length&&!series.length){chartEl.innerHTML='<div class="empty">当前节点的曲线都已关闭。点上方线路开关重新显示。</div>';$('curveLegend').innerHTML='';return}
+      if(loading&&!series.some(s=>s.records.length)){chartEl.innerHTML='<div class="empty">正在加载曲线样本...</div>';$('curveLegend').innerHTML='';return}
       const width=compact?Math.max(360,chartWidth):1160, height=compact?320:430, left=compact?64:64, right=compact?18:26, top=compact?24:28, bottom=compact?54:48;
       const allTimes=series.flatMap(s=>s.records.map(r=>r.time)).filter(Number.isFinite);
       const values=series.flatMap(s=>s.records.map(r=>r.value)).filter(value=>value!==null&&Number.isFinite(value));
@@ -505,12 +502,11 @@
       const legendLimit=compact?36:80, extra=Math.max(0,series.length-legendLimit);
       $('curveLegend').innerHTML=series.slice(0,legendLimit).map(s=>'<span class="legend-item"><span class="legend-dot" style="background:'+(s.color||palette[0])+'"></span>'+escapeHTML(s.label)+'</span>').join('')+(extra?'<span class="legend-item">+'+extra+' 条</span>':'');
     }
-    document.querySelectorAll('[data-hours]').forEach(btn=>btn.addEventListener('click',()=>{hours=Number(btn.dataset.hours)||24;sampleCache.clear();hiddenSeries.clear();selectionTouched=true;renderAll();loadSamplesForSelected(true).catch(e=>toast(e.message,true))}));
+    document.querySelectorAll('[data-hours]').forEach(btn=>btn.addEventListener('click',()=>{hours=Number(btn.dataset.hours)||24;sampleCache.clear();selectionTouched=true;renderAll();loadSamplesForSelected(true).catch(e=>toast(e.message,true))}));
     document.querySelectorAll('[data-metric]').forEach(btn=>btn.addEventListener('click',()=>{metric=btn.dataset.metric||'rtt';renderAll()}));
     $('despikeBtn').addEventListener('click',()=>{despike=!despike;renderAll()});
-    $('resetSeriesBtn').addEventListener('click',()=>{hiddenSeries.clear();renderChart()});
-    $('searchInput').addEventListener('input',e=>{keyword=e.target.value;selectionTouched=false;hiddenSeries.clear();renderAfterScopeChange()});
-    $('reloadBtn').addEventListener('click',()=>{sampleCache.clear();hiddenSeries.clear();load(true).catch(e=>toast(e.message,true))});
+    $('searchInput').addEventListener('input',e=>{keyword=e.target.value;selectionTouched=false;renderAfterScopeChange()});
+    $('reloadBtn').addEventListener('click',()=>{sampleCache.clear();load(true).catch(e=>toast(e.message,true))});
     load().catch(e=>toast(e.message,true));
     setInterval(()=>load(true).catch(console.error),30000);
   </script>

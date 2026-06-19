@@ -463,6 +463,10 @@ func (s *Server) handleNodes(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 	cfg := s.configSnapshot()
 	agentCarriers := configuredAgentCarriers(cfg)
+	agentRank := make(map[string]int, len(cfg.Agents))
+	for i, agent := range cfg.Agents {
+		agentRank[agent.ID] = i
+	}
 	s.nodesMu.RLock()
 	nodes := append([]model.ProxyNode(nil), s.nodes...)
 	s.nodesMu.RUnlock()
@@ -473,7 +477,7 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	samples = filterSamplesForAgents(samples, agentCarriers)
-	latestByNodeCarrier := make(map[string]map[string]model.NodeSample)
+	latestByNodeAgent := make(map[string]map[string]model.NodeSample)
 	stats := make(map[string][]model.NodeSample)
 	for _, sample := range samples {
 		node, ok := nodesIndex[sample.NodeID]
@@ -481,25 +485,35 @@ func (s *Server) handleOverview(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		stats[sample.NodeID] = append(stats[sample.NodeID], sample)
-		if latestByNodeCarrier[sample.NodeID] == nil {
-			latestByNodeCarrier[sample.NodeID] = map[string]model.NodeSample{}
+		if latestByNodeAgent[sample.NodeID] == nil {
+			latestByNodeAgent[sample.NodeID] = map[string]model.NodeSample{}
 		}
-		key := sample.Carrier
+		key := sample.AgentID
 		if key == "" {
-			key = sample.AgentID
+			key = sample.Carrier
 		}
-		current, ok := latestByNodeCarrier[sample.NodeID][key]
+		current, ok := latestByNodeAgent[sample.NodeID][key]
 		if !ok || sample.Time.After(current.Time) {
-			latestByNodeCarrier[sample.NodeID][key] = sample
+			latestByNodeAgent[sample.NodeID][key] = sample
 		}
 	}
 	overview := make([]model.NodeOverview, 0, len(nodes))
 	for _, node := range nodes {
 		item := model.NodeOverview{Node: publicNode(node)}
-		for _, sample := range latestByNodeCarrier[node.ID] {
+		for _, sample := range latestByNodeAgent[node.ID] {
 			item.Latest = append(item.Latest, sample)
 		}
-		sort.Slice(item.Latest, func(i, j int) bool { return item.Latest[i].Carrier < item.Latest[j].Carrier })
+		sort.Slice(item.Latest, func(i, j int) bool {
+			left, leftOK := agentRank[item.Latest[i].AgentID]
+			right, rightOK := agentRank[item.Latest[j].AgentID]
+			if leftOK && rightOK && left != right {
+				return left < right
+			}
+			if leftOK != rightOK {
+				return leftOK
+			}
+			return item.Latest[i].AgentID < item.Latest[j].AgentID
+		})
 		var okCount int
 		for _, sample := range stats[node.ID] {
 			if sample.Success {
