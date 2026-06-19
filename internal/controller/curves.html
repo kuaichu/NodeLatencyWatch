@@ -134,7 +134,6 @@
     <div class="rails">
       <div class="rail" id="providerRail"></div>
       <div class="rail" id="countryRail"></div>
-      <div class="rail" id="agentRail"></div>
     </div>
 
     <section class="panel board">
@@ -208,20 +207,17 @@
     const metricInfo={rtt:{label:'RTT',unit:'ms'},http:{label:'HTTP',unit:'ms'},jitter:{label:'抖动',unit:'ms'},loss:{label:'丢包',unit:'%'}};
     const palette=['#2f7dff','#ee4f9a','#ff9f2e','#b85cff','#20d6a2','#40d7d3','#5a8dee','#7447d8','#d346a4','#69b7ff','#f4c95d','#ff6b6b','#74d680','#c087ff','#ff7ec2','#5ce1ff'];
     const $=id=>document.getElementById(id);
-    let adminConfig=null, lastStatus=null, overview=[], agents=[], providers=[], selectedProvider='all', selectedCountry='all', selectedAgent='all', selectedNodeId='', metric='rtt', hours=24, despike=true, keyword='', selectionTouched=false;
+    let adminConfig=null, lastStatus=null, overview=[], agents=[], providers=[], selectedProvider='all', selectedCountry='all', selectedNodeId='', metric='rtt', hours=24, despike=true, keyword='', selectionTouched=false;
     const sampleCache=new Map(), loadingNodes=new Set();
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
     function toast(text,bad=false){const el=$('toast');el.textContent=text;el.style.borderColor=bad?'rgba(255,107,107,.5)':'rgba(32,214,162,.45)';el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2400)}
     async function apiJSON(url,options){const resp=await fetch(url,options);if(!resp.ok)throw new Error(await resp.text()||resp.statusText);const data=await resp.json();if(data&&data.error)throw new Error(data.error);return data}
-    function agentLabel(agent){return agent?(agent.name||agent.id||'未知机子'):'全部机子'}
     function agentById(id){return agents.find(agent=>agent.id===id)||(adminConfig&&adminConfig.agents||[]).find(agent=>agent.id===id)||null}
     function agentDisplayName(id,sample){
       const agent=agentById(id);
       return (agent&&(agent.probeSource||agent.name||agent.id))||(sample&&(sample.probeSource||sample.agentName||sample.agentId))||id||'未知探测源';
     }
     function agentSortIndex(id){const index=visibleAgents().findIndex(agent=>agent.id===id);return index>=0?index:9999}
-    function activeAgent(){return selectedAgent==='all'?null:agents.find(agent=>agent.id===selectedAgent)}
-    function activeAgentLabel(){return selectedAgent==='all'?'全部机子':agentLabel(activeAgent())}
     function providerKeyForRow(row){const n=row&&row.node?row.node:{};return n.providerId||n.provider||'unknown'}
     function providerNameForRow(row){const n=row&&row.node?row.node:{};return n.provider||n.providerId||'未知机场'}
     function providerLabel(value){const found=providers.find(provider=>provider.id===value);return found?found.name:value}
@@ -287,16 +283,16 @@
       const list=(row&&row.latest)||[], used=new Set(), out=[];
       const byAgent=new Map();
       list.forEach(sample=>{if(sample.agentId)byAgent.set(sample.agentId,sample)});
-      const orderedAgents=selectedAgent==='all'?visibleAgents():visibleAgents().filter(agent=>agent.id===selectedAgent);
+      const orderedAgents=visibleAgents();
       orderedAgents.forEach(agent=>{
         const sample=byAgent.get(agent.id);
         if(sample){out.push(sample);used.add(sample)}
       });
-      list.forEach(sample=>{if(!used.has(sample)&&(selectedAgent==='all'||sample.agentId===selectedAgent))out.push(sample)});
+      list.forEach(sample=>{if(!used.has(sample))out.push(sample)});
       return out;
     }
     function rowsBeforeCountry(){
-      return (overview||[]).map(row=>selectedAgent==='all'?row:{...row,latest:(row.latest||[]).filter(sample=>sample.agentId===selectedAgent)})
+      return (overview||[])
         .filter(row=>selectedProvider==='all'||providerKeyForRow(row)===selectedProvider)
         .filter(row=>(row.latest||[]).length);
     }
@@ -352,7 +348,6 @@
       agents=Array.isArray(agentData)?agentData:[];
       providers=buildProviders(cfg,overview);
       if(selectedProvider!=='all'&&!providers.some(provider=>provider.id===selectedProvider))selectedProvider='all';
-      if(selectedAgent!=='all'&&!visibleAgents().some(agent=>agent.id===selectedAgent))selectedAgent='all';
       const rows=scopedRows();
       ensureSelection(rows);
       renderAll(status,rows);
@@ -375,9 +370,6 @@
       if(selectedCountry!=='all'&&!countryList.some(country=>country.code===selectedCountry))selectedCountry='all';
       $('countryRail').innerHTML='<button class="chip country-chip '+(selectedCountry==='all'?'active':'')+'" data-country="all">全部地区<span class="country-count">'+countryRows.length+'</span></button>'+countryList.map(country=>'<button class="chip country-chip '+(selectedCountry===country.code?'active':'')+'" data-country="'+escapeHTML(country.code)+'">'+flagHTML(country)+'<span>'+escapeHTML(country.label)+'</span><span class="country-count">'+Number(country.count||0)+'</span></button>').join('');
       document.querySelectorAll('[data-country]').forEach(btn=>btn.addEventListener('click',()=>{selectedCountry=btn.dataset.country;selectionTouched=false;renderAfterScopeChange()}));
-      const list=visibleAgents();
-      $('agentRail').innerHTML='<button class="chip '+(selectedAgent==='all'?'active':'')+'" data-agent="all">全部机子</button>'+list.map(agent=>'<button class="chip '+(selectedAgent===agent.id?'active':'')+'" data-agent="'+escapeHTML(agent.id)+'">'+escapeHTML(agentLabel(agent))+'</button>').join('');
-      document.querySelectorAll('[data-agent]').forEach(btn=>btn.addEventListener('click',()=>{selectedAgent=btn.dataset.agent;selectionTouched=false;renderAfterScopeChange()}));
     }
     function renderTools(){
       document.querySelectorAll('[data-hours]').forEach(btn=>btn.classList.toggle('active',Number(btn.dataset.hours)===hours));
@@ -396,7 +388,7 @@
       const selected=selectedNodeId&&rows.some(row=>row.node.id===selectedNodeId)?1:0;
       $('scopeTitle').textContent=(selectedProvider==='all'?'全部机场':providerLabel(selectedProvider));
       const row=selectedRow();
-      $('scopeSub').textContent=activeAgentLabel()+' · '+metricInfo[metric].label+' · 当前节点 '+(row?cleanNodeName(row.node.name):'未选择')+' · 顶部机子筛选可单独查看探测源';
+      $('scopeSub').textContent=metricInfo[metric].label+' · 当前节点 '+(row?cleanNodeName(row.node.name):'未选择')+' · 节点卡按探测源顺序展示';
       $('visibleCount').textContent=rows.length;
       $('selectedCount').textContent=selected;
       $('hoursCount').textContent=hours>=720?'30d':hours>=168?'7d':'24h';
@@ -429,7 +421,7 @@
       const out=[];
       const row=selectedRow();
       if(!row)return out;
-      const samples=(sampleCache.get(cacheKey(row.node.id))||[]).filter(sample=>selectedAgent==='all'||sample.agentId===selectedAgent);
+      const samples=sampleCache.get(cacheKey(row.node.id))||[];
       const groups=new Map();
       samples.forEach(sample=>{
         const key=sample.agentId||sampleCarrierKey(sample);
