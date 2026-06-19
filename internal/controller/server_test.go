@@ -43,8 +43,15 @@ func TestSampleMatchesCurrentProbeMode(t *testing.T) {
 }
 
 func TestInstallCommandDefaultsToDynamicAgentID(t *testing.T) {
+	oldDetect := detectControllerURLs
+	detectControllerURLs = func(scheme, port string) []string {
+		return []string{"http://172.23.93.195:19200", "http://10.0.0.234:19200"}
+	}
+	t.Cleanup(func() { detectControllerURLs = oldDetect })
+
 	s := &Server{cfg: &config.Config{
-		Agent: config.AgentConfig{Token: "test-token"},
+		WebPort: 19200,
+		Agent:   config.AgentConfig{Token: "test-token"},
 		Agents: []model.AgentPeer{
 			{ID: "agent-Yeque", Name: "Yeque_FnOS", ProbeSource: "宁波联通", Carrier: "unicom"},
 		},
@@ -63,6 +70,12 @@ func TestInstallCommandDefaultsToDynamicAgentID(t *testing.T) {
 	}
 	if strings.Contains(resp.Command, "agent-Yeque") {
 		t.Fatalf("default install command reused existing agent: %s", resp.Command)
+	}
+	if !strings.Contains(resp.Command, "http://172.23.93.195:19200/install.sh") {
+		t.Fatalf("install command should prefer ZeroTier URL: %s", resp.Command)
+	}
+	if !strings.Contains(resp.Command, "--fallback-controller 'http://10.0.0.234:19200'") {
+		t.Fatalf("install command should include LAN fallback URL: %s", resp.Command)
 	}
 	if !strings.Contains(resp.Command, `--id "agent-$(hostname -s)"`) {
 		t.Fatalf("default install command should use dynamic hostname id: %s", resp.Command)

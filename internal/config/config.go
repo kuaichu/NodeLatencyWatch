@@ -12,14 +12,15 @@ import (
 )
 
 type AgentConfig struct {
-	ID                string `yaml:"id"`
-	Name              string `yaml:"name"`
-	ControllerURL     string `yaml:"controller_url"`
-	Token             string `yaml:"token"`
-	ProbeSource       string `yaml:"probe_source"`
-	Carrier           string `yaml:"carrier"`
-	ReportIntervalSec int    `yaml:"report_interval_seconds"`
-	ReportTTLSeconds  int    `yaml:"report_ttl_seconds"`
+	ID                string   `yaml:"id"`
+	Name              string   `yaml:"name"`
+	ControllerURL     string   `yaml:"controller_url"`
+	ControllerURLs    []string `yaml:"controller_urls,omitempty"`
+	Token             string   `yaml:"token"`
+	ProbeSource       string   `yaml:"probe_source"`
+	Carrier           string   `yaml:"carrier"`
+	ReportIntervalSec int      `yaml:"report_interval_seconds"`
+	ReportTTLSeconds  int      `yaml:"report_ttl_seconds"`
 }
 
 type Config struct {
@@ -148,15 +149,20 @@ func (c *Config) Normalize(configPath string) error {
 		return fmt.Errorf("probe.test_url host is required")
 	}
 	c.Agent.Carrier = model.NormalizeCarrier(c.Agent.Carrier)
+	controllerURLs, err := normalizeControllerURLs(c.Agent.ControllerURL, c.Agent.ControllerURLs)
+	if err != nil {
+		return err
+	}
+	c.Agent.ControllerURLs = controllerURLs
+	if len(controllerURLs) > 0 {
+		c.Agent.ControllerURL = controllerURLs[0]
+	}
 	if c.IsAgentMode() {
 		if strings.TrimSpace(c.Agent.ID) == "" {
 			return fmt.Errorf("agent.id is required")
 		}
-		if strings.TrimSpace(c.Agent.ControllerURL) == "" {
+		if len(c.Agent.ControllerURLs) == 0 {
 			return fmt.Errorf("agent.controller_url is required")
-		}
-		if _, err := url.ParseRequestURI(c.Agent.ControllerURL); err != nil {
-			return fmt.Errorf("agent.controller_url is invalid: %w", err)
 		}
 		if strings.TrimSpace(c.Agent.Token) == "" {
 			return fmt.Errorf("agent.token is required")
@@ -195,6 +201,39 @@ func (c *Config) Normalize(configPath string) error {
 		}
 	}
 	return nil
+}
+
+func normalizeControllerURLs(primary string, values []string) ([]string, error) {
+	raw := make([]string, 0, len(values)+1)
+	if strings.TrimSpace(primary) != "" {
+		raw = append(raw, primary)
+	}
+	raw = append(raw, values...)
+	out := make([]string, 0, len(raw))
+	seen := make(map[string]struct{}, len(raw))
+	for _, value := range raw {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		parsed, err := url.ParseRequestURI(value)
+		if err != nil {
+			return nil, fmt.Errorf("agent.controller_url is invalid: %w", err)
+		}
+		if parsed.Scheme != "http" && parsed.Scheme != "https" {
+			return nil, fmt.Errorf("agent.controller_url must use http or https")
+		}
+		if strings.TrimSpace(parsed.Hostname()) == "" {
+			return nil, fmt.Errorf("agent.controller_url host is required")
+		}
+		key := strings.TrimRight(value, "/")
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	return out, nil
 }
 
 func (c *Config) IsAgentMode() bool {

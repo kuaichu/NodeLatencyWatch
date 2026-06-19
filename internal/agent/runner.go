@@ -22,10 +22,10 @@ func Run(cfg *config.Config) {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt)
 
-	log.Printf("[agent] starting %s (%s) -> %s", cfg.Agent.ID, model.CarrierLabel(cfg.Agent.Carrier), cfg.Agent.ControllerURL)
+	log.Printf("[agent] starting %s (%s) -> %s", cfg.Agent.ID, model.CarrierLabel(cfg.Agent.Carrier), strings.Join(controllerURLs(cfg), ", "))
 	for {
 		started := time.Now()
-		job, err := fetchJob(client, cfg)
+		job, controllerURL, err := fetchJob(client, cfg)
 		if err != nil {
 			log.Printf("[agent] fetch job failed: %v", err)
 			if waitOrStop(sigCh, 30*time.Second) {
@@ -34,7 +34,7 @@ func Run(cfg *config.Config) {
 			continue
 		}
 		report := runJob(cfg, job)
-		if err := postReport(client, cfg, report); err != nil {
+		if err := postReport(client, cfg, report, controllerURL); err != nil {
 			log.Printf("[agent] post report failed: %v", err)
 		} else {
 			log.Printf("[agent] report sent nodes=%d", len(report.Results))
@@ -54,27 +54,37 @@ func Run(cfg *config.Config) {
 	}
 }
 
-func fetchJob(client *http.Client, cfg *config.Config) (*model.JobResponse, error) {
-	req, err := http.NewRequest("GET", endpoint(cfg.Agent.ControllerURL, "/api/agent/jobs"), nil)
-	if err != nil {
-		return nil, err
+func fetchJob(client *http.Client, cfg *config.Config) (*model.JobResponse, string, error) {
+	var failures []string
+	for _, controllerURL := range controllerURLs(cfg) {
+		req, err := http.NewRequest("GET", endpoint(controllerURL, "/api/agent/jobs"), nil)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", controllerURL, err))
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+cfg.Agent.Token)
+		req.Header.Set("X-Agent-ID", cfg.Agent.ID)
+		req.Header.Set("X-Agent-Name", agentName(cfg))
+		resp, err := client.Do(req)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", controllerURL, err))
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			failures = append(failures, fmt.Sprintf("%s: controller returned %s", controllerURL, resp.Status))
+			resp.Body.Close()
+			continue
+		}
+		var job model.JobResponse
+		err = json.NewDecoder(resp.Body).Decode(&job)
+		resp.Body.Close()
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", controllerURL, err))
+			continue
+		}
+		return &job, controllerURL, nil
 	}
-	req.Header.Set("Authorization", "Bearer "+cfg.Agent.Token)
-	req.Header.Set("X-Agent-ID", cfg.Agent.ID)
-	req.Header.Set("X-Agent-Name", agentName(cfg))
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("controller returned %s", resp.Status)
-	}
-	var job model.JobResponse
-	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
-		return nil, err
-	}
-	return &job, nil
+	return nil, "", fmt.Errorf("all controller URLs failed: %s", strings.Join(failures, "; "))
 }
 
 func runJob(cfg *config.Config, job *model.JobResponse) model.AgentReport {
@@ -118,26 +128,33 @@ func runJob(cfg *config.Config, job *model.JobResponse) model.AgentReport {
 	}
 }
 
-func postReport(client *http.Client, cfg *config.Config, report model.AgentReport) error {
+func postReport(client *http.Client, cfg *config.Config, report model.AgentReport, preferredControllerURL string) error {
 	body, err := json.Marshal(report)
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequest("POST", endpoint(cfg.Agent.ControllerURL, "/api/agent/reports"), bytes.NewReader(body))
-	if err != nil {
-		return err
+	var failures []string
+	for _, controllerURL := range orderedControllerURLs(cfg, preferredControllerURL) {
+		req, err := http.NewRequest("POST", endpoint(controllerURL, "/api/agent/reports"), bytes.NewReader(body))
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", controllerURL, err))
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+cfg.Agent.Token)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := client.Do(req)
+		if err != nil {
+			failures = append(failures, fmt.Sprintf("%s: %v", controllerURL, err))
+			continue
+		}
+		resp.Body.Close()
+		if resp.StatusCode >= 300 {
+			failures = append(failures, fmt.Sprintf("%s: controller returned %s", controllerURL, resp.Status))
+			continue
+		}
+		return nil
 	}
-	req.Header.Set("Authorization", "Bearer "+cfg.Agent.Token)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("controller returned %s", resp.Status)
-	}
-	return nil
+	return fmt.Errorf("all controller URLs failed: %s", strings.Join(failures, "; "))
 }
 
 func waitOrStop(sigCh <-chan os.Signal, d time.Duration) bool {
@@ -154,6 +171,33 @@ func waitOrStop(sigCh <-chan os.Signal, d time.Duration) bool {
 
 func endpoint(base, path string) string {
 	return strings.TrimRight(base, "/") + path
+}
+
+func controllerURLs(cfg *config.Config) []string {
+	values := append([]string{}, cfg.Agent.ControllerURLs...)
+	values = append(values, cfg.Agent.ControllerURL)
+	return uniqueControllerURLs(values...)
+}
+
+func orderedControllerURLs(cfg *config.Config, preferred string) []string {
+	return uniqueControllerURLs(append([]string{preferred}, controllerURLs(cfg)...)...)
+}
+
+func uniqueControllerURLs(values ...string) []string {
+	var out []string
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func agentName(cfg *config.Config) string {

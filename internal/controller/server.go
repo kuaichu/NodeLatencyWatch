@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,6 +23,8 @@ import (
 
 //go:embed dashboard.html
 var dashboardFS embed.FS
+
+var detectControllerURLs = detectControllerInterfaceURLs
 
 type Server struct {
 	configPath string
@@ -210,7 +214,12 @@ func (s *Server) handleInstallCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := s.configSnapshot()
-	controllerURL := publicBaseURL(r)
+	controllerURLs := s.controllerAccessURLs(r)
+	controllerURL := controllerURLs[0]
+	fallbackControllerURL := ""
+	if len(controllerURLs) > 1 {
+		fallbackControllerURL = controllerURLs[1]
+	}
 	id := strings.TrimSpace(r.URL.Query().Get("id"))
 	dynamicID := id == "" || isHostnamePlaceholder(id)
 	if dynamicID {
@@ -234,16 +243,25 @@ func (s *Server) handleInstallCommand(w http.ResponseWriter, r *http.Request) {
 	}
 	carrier := model.NormalizeCarrier(r.URL.Query().Get("carrier"))
 	token := strings.TrimSpace(cfg.Agent.Token)
+	installFetch := "curl -fsSL " + shellQuote(controllerURL+"/install.sh")
+	if fallbackControllerURL != "" {
+		installFetch = "(" + installFetch + " || curl -fsSL " + shellQuote(fallbackControllerURL+"/install.sh") + ")"
+	}
 	parts := []string{
-		"curl -fsSL " + shellQuote(controllerURL+"/install.sh"),
+		installFetch,
 		"|",
 		"sudo bash -s --",
 		"--controller " + shellQuote(controllerURL),
-		"--id " + shellValue(id, dynamicID),
-		"--name " + shellValue(name, dynamicName),
-		"--probe-source " + shellValue(probeSource, dynamicProbeSource),
-		"--carrier " + shellQuote(carrier),
 	}
+	if fallbackControllerURL != "" {
+		parts = append(parts, "--fallback-controller "+shellQuote(fallbackControllerURL))
+	}
+	parts = append(parts,
+		"--id "+shellValue(id, dynamicID),
+		"--name "+shellValue(name, dynamicName),
+		"--probe-source "+shellValue(probeSource, dynamicProbeSource),
+		"--carrier "+shellQuote(carrier),
+	)
 	if token != "" {
 		parts = append(parts, "--token "+shellQuote(token))
 	} else {
@@ -1174,6 +1192,92 @@ func publicBaseURL(r *http.Request) string {
 	return scheme + "://" + strings.TrimSpace(host)
 }
 
+func (s *Server) controllerAccessURLs(r *http.Request) []string {
+	requestURL := publicBaseURL(r)
+	parsed, err := url.Parse(requestURL)
+	if err != nil {
+		return []string{requestURL}
+	}
+	port := parsed.Port()
+	if port == "" {
+		if cfg := s.configSnapshot(); cfg.WebPort > 0 {
+			port = strconv.Itoa(cfg.WebPort)
+		}
+	}
+	return uniqueStrings(append(detectControllerURLs(parsed.Scheme, port), requestURL)...)
+}
+
+func detectControllerInterfaceURLs(scheme, port string) []string {
+	if scheme == "" {
+		scheme = "http"
+	}
+	var zerotier []string
+	var lan []string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		name := strings.ToLower(iface.Name)
+		isZeroTier := strings.Contains(name, "zerotier") || strings.HasPrefix(name, "zt") || strings.Contains(name, "-zt")
+		for _, addr := range addrs {
+			ip := interfaceIPv4(addr)
+			if ip == nil || !ip.IsPrivate() {
+				continue
+			}
+			value := scheme + "://" + hostPort(ip.String(), port)
+			if isZeroTier {
+				zerotier = append(zerotier, value)
+			} else {
+				lan = append(lan, value)
+			}
+		}
+	}
+	return uniqueStrings(append(zerotier, lan...)...)
+}
+
+func interfaceIPv4(addr net.Addr) net.IP {
+	switch typed := addr.(type) {
+	case *net.IPNet:
+		return typed.IP.To4()
+	case *net.IPAddr:
+		return typed.IP.To4()
+	default:
+		return nil
+	}
+}
+
+func hostPort(host, port string) string {
+	if strings.TrimSpace(port) == "" {
+		return host
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func uniqueStrings(values ...string) []string {
+	out := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.TrimRight(strings.TrimSpace(value), "/")
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
 func shellQuote(value string) string {
 	if value == "" {
 		return "''"
@@ -1203,6 +1307,7 @@ func agentInstallScript() string {
 set -euo pipefail
 
 CONTROLLER_URL=""
+FALLBACK_CONTROLLER_URL=""
 TOKEN=""
 AGENT_ID=""
 AGENT_NAME=""
@@ -1216,13 +1321,14 @@ SERVICE_NAME="${SERVICE_NAME:-node-latency-agent}"
 
 usage() {
   cat <<USAGE
-Usage: install.sh --controller URL --token TOKEN --id ID [--name NAME] [--probe-source SOURCE] [--carrier telecom|unicom|mobile|unknown] [--interval SECONDS]
+Usage: install.sh --controller URL [--fallback-controller URL] --token TOKEN --id ID [--name NAME] [--probe-source SOURCE] [--carrier telecom|unicom|mobile|unknown] [--interval SECONDS]
 USAGE
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --controller) CONTROLLER_URL="${2:-}"; shift 2 ;;
+    --fallback-controller) FALLBACK_CONTROLLER_URL="${2:-}"; shift 2 ;;
     --token) TOKEN="${2:-}"; shift 2 ;;
     --id) AGENT_ID="${2:-}"; shift 2 ;;
     --name) AGENT_NAME="${2:-}"; shift 2 ;;
@@ -1257,6 +1363,10 @@ fi
 AGENT_NAME="${AGENT_NAME:-$AGENT_ID}"
 PROBE_SOURCE="${PROBE_SOURCE:-$AGENT_NAME}"
 CONTROLLER_URL="${CONTROLLER_URL%/}"
+FALLBACK_CONTROLLER_URL="${FALLBACK_CONTROLLER_URL%/}"
+if [ "$FALLBACK_CONTROLLER_URL" = "$CONTROLLER_URL" ]; then
+  FALLBACK_CONTROLLER_URL=""
+fi
 
 ARCH="$(uname -m)"
 case "$ARCH" in
@@ -1284,12 +1394,24 @@ download() {
 
 BIN_TMP="$TMP/node-latency-agent"
 PRIMARY_URL="$CONTROLLER_URL/api/agent/download/$TARGET"
-FALLBACK_URL="${GITHUB_BASE%/}/node-latency-agent-$TARGET"
+CONTROLLER_FALLBACK_URL=""
+if [ -n "$FALLBACK_CONTROLLER_URL" ]; then
+  CONTROLLER_FALLBACK_URL="$FALLBACK_CONTROLLER_URL/api/agent/download/$TARGET"
+fi
+GITHUB_URL="${GITHUB_BASE%/}/node-latency-agent-$TARGET"
 
 echo "[1/4] Downloading agent binary from controller: $PRIMARY_URL"
 if ! download "$PRIMARY_URL" "$BIN_TMP"; then
-  echo "[warn] Controller download failed, falling back to GitHub: $FALLBACK_URL"
-  download "$FALLBACK_URL" "$BIN_TMP"
+  if [ -n "$CONTROLLER_FALLBACK_URL" ]; then
+    echo "[warn] Primary controller download failed, trying fallback controller: $CONTROLLER_FALLBACK_URL"
+    download "$CONTROLLER_FALLBACK_URL" "$BIN_TMP" || {
+      echo "[warn] Fallback controller download failed, falling back to GitHub: $GITHUB_URL"
+      download "$GITHUB_URL" "$BIN_TMP"
+    }
+  else
+    echo "[warn] Controller download failed, falling back to GitHub: $GITHUB_URL"
+    download "$GITHUB_URL" "$BIN_TMP"
+  fi
 fi
 
 install -d "$INSTALL_DIR" "$CONFIG_DIR"
@@ -1302,6 +1424,15 @@ agent:
   id: "$AGENT_ID"
   name: "$AGENT_NAME"
   controller_url: "$CONTROLLER_URL"
+  controller_urls:
+    - "$CONTROLLER_URL"
+YAML
+if [ -n "$FALLBACK_CONTROLLER_URL" ]; then
+  cat >> "$CONFIG_DIR/agent.yaml" <<YAML
+    - "$FALLBACK_CONTROLLER_URL"
+YAML
+fi
+cat >> "$CONFIG_DIR/agent.yaml" <<YAML
   token: "$TOKEN"
   probe_source: "$PROBE_SOURCE"
   carrier: "$CARRIER"

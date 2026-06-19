@@ -4,6 +4,8 @@ agent:
   id: "ct-ningbo-01"
   name: "宁波电信 01"
   controller_url: "http://127.0.0.1:19200"
+  controller_urls:
+    - "http://127.0.0.1:19200"
   token: "change-this-long-random-token"
   probe_source: "宁波电信"
   carrier: "telecom"
