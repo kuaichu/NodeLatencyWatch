@@ -21,7 +21,7 @@ import (
 	"node-latency-watch/internal/subscription"
 )
 
-//go:embed dashboard.html
+//go:embed dashboard.html curves.html
 var dashboardFS embed.FS
 
 var detectControllerURLs = detectControllerInterfaceURLs
@@ -127,6 +127,7 @@ func (s *Server) replaceConfig(next *config.Config) {
 func (s *Server) Start() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handleDashboard)
+	mux.HandleFunc("/curves", s.handleCurves)
 	mux.HandleFunc("/api/status", s.handleStatus)
 	mux.HandleFunc("/api/nodes", s.handleNodes)
 	mux.HandleFunc("/api/overview", s.handleOverview)
@@ -415,6 +416,21 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
+func (s *Server) handleCurves(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/curves" {
+		http.NotFound(w, r)
+		return
+	}
+	data, err := dashboardFS.ReadFile("curves.html")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	setNoStore(w)
+	_, _ = w.Write(data)
+}
+
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	cfg := s.configSnapshot()
 	reports, _ := s.store.AgentReports(time.Duration(cfg.Agent.ReportTTLSeconds) * time.Second)
@@ -525,8 +541,8 @@ func (s *Server) handleSamples(w http.ResponseWriter, r *http.Request) {
 			hours = parsed
 		}
 	}
-	if hours > 168 {
-		hours = 168
+	if hours > 720 {
+		hours = 720
 	}
 	carrierFilter := model.NormalizeCarrier(r.URL.Query().Get("carrier"))
 	nodeID := strings.TrimSpace(r.URL.Query().Get("node_id"))

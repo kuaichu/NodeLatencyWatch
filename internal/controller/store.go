@@ -157,7 +157,10 @@ func (s *Store) SamplesForNode(nodeID string, since time.Time, limit int) ([]mod
 		limit = 1000
 	}
 	rows, err := s.db.Query(`SELECT time, agent_id, agent_name, carrier, carrier_label, probe_source, provider_id, provider, category, node_id, node_name, protocol, server, port, dns_ms, tcp_ms, tls_ms, max_rtt_ms, rtt_stddev_ms, http_ms, attempts, successes, loss_rate, success, error, resolved_ip, probe_mode
-		FROM node_samples WHERE node_id = ? AND time >= ? ORDER BY time ASC LIMIT ?`, nodeID, timeText(since), limit)
+		FROM (
+			SELECT time, agent_id, agent_name, carrier, carrier_label, probe_source, provider_id, provider, category, node_id, node_name, protocol, server, port, dns_ms, tcp_ms, tls_ms, max_rtt_ms, rtt_stddev_ms, http_ms, attempts, successes, loss_rate, success, error, resolved_ip, probe_mode
+			FROM node_samples WHERE node_id = ? AND time >= ? ORDER BY time DESC LIMIT ?
+		) ORDER BY time ASC`, nodeID, timeText(since), limit)
 	if err != nil {
 		return nil, err
 	}
