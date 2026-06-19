@@ -1,8 +1,13 @@
 package controller
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"node-latency-watch/internal/config"
 	"node-latency-watch/internal/model"
 )
 
@@ -34,5 +39,32 @@ func TestSampleMatchesCurrentProbeMode(t *testing.T) {
 				t.Fatalf("sampleMatchesCurrentProbeMode() = %v, want %v", got, tc.expect)
 			}
 		})
+	}
+}
+
+func TestInstallCommandDefaultsToDynamicAgentID(t *testing.T) {
+	s := &Server{cfg: &config.Config{
+		Agent: config.AgentConfig{Token: "test-token"},
+		Agents: []model.AgentPeer{
+			{ID: "agent-Yeque", Name: "Yeque_FnOS", ProbeSource: "宁波联通", Carrier: "unicom"},
+		},
+	}}
+	req := httptest.NewRequest(http.MethodGet, "http://controller.local/api/admin/install-command", nil)
+	rec := httptest.NewRecorder()
+
+	s.handleInstallCommand(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var resp installCommandResponse
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if strings.Contains(resp.Command, "agent-Yeque") {
+		t.Fatalf("default install command reused existing agent: %s", resp.Command)
+	}
+	if !strings.Contains(resp.Command, `--id "agent-$(hostname -s)"`) {
+		t.Fatalf("default install command should use dynamic hostname id: %s", resp.Command)
 	}
 }

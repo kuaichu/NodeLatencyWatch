@@ -322,9 +322,12 @@
               <div class="settings-card-head">
                 <div>
                   <div class="settings-card-title">一键安装 Agent</div>
-                  <div class="small" id="installHint">先新增或选择第一个 Agent，再复制命令到目标机器执行。</div>
+                  <div class="small" id="installHint">默认使用目标机器 hostname 生成新 Agent ID。</div>
                 </div>
-                <button class="btn" id="copyInstallBtn">复制命令</button>
+                <div class="inline-actions">
+                  <button class="btn" id="resetInstallBtn">新机器命令</button>
+                  <button class="btn" id="copyInstallBtn">复制命令</button>
+                </div>
               </div>
               <div class="field"><label>Linux systemd 安装命令</label><textarea id="installCommand" readonly spellcheck="false"></textarea></div>
             </div>
@@ -443,7 +446,7 @@
     const curveMetrics={rtt:{label:'RTT',unit:'ms'},http:{label:'HTTP',unit:'ms'},jitter:{label:'抖动',unit:'ms'},loss:{label:'丢包',unit:'%'}};
     const curvePalette=['#20d6a2','#69b7ff','#f4c95d','#ff8fa3','#b99cff','#69dfd5'];
     const $=id=>document.getElementById(id);
-    let adminConfig=null, activeTab='providers', selectedProvider='all', selectedCountry='all', matrixSort='default', matrixSortDir='asc', matrixMetricCarrier='best', lastStatus=null, lastOverview=[], matrixCarriers=[], matrixProviders=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='';
+    let adminConfig=null, activeTab='providers', selectedProvider='all', selectedCountry='all', matrixSort='default', matrixSortDir='asc', matrixMetricCarrier='best', lastStatus=null, lastOverview=[], matrixCarriers=[], matrixProviders=[], lastAgentStatuses=[], settingsDirty=false, activeSubProviderId='', installAgentIndex=null;
     const matrixFilters={rtt:'',http:'',jitter:'',loss:''};
     const curveState={node:null,samples:[],metric:'rtt',carrier:'all',hours:24,loading:false,despike:true};
     function escapeHTML(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -900,8 +903,10 @@
       }
     }
     function renderAgentEditor(agents,statuses){
-      $('agentEditor').innerHTML=agents.length?agents.map((a,i)=>'<div class="editor-card" data-agent-index="'+i+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(a.name||a.id)+'</div><div class="editor-sub">'+escapeHTML(a.id||'')+' · '+escapeHTML(a.probeSource||'-')+'</div></div><button class="btn btn-danger" data-remove-agent="'+i+'">删除</button></div><div class="form-grid"><div class="field"><label>Agent ID</label><input data-agent-field="id" value="'+escapeHTML(a.id||'')+'"></div><div class="field"><label>显示名</label><input data-agent-field="name" value="'+escapeHTML(a.name||'')+'"></div><div class="field"><label>地区 / 探测源</label><input data-agent-field="probeSource" value="'+escapeHTML(a.probeSource||'')+'"></div><div class="field"><label>运营商</label><select data-agent-field="carrier">'+carrierOptions(a.carrier||'unknown')+'</select></div></div></div>').join(''):'<div class="empty">还没有配置 Agent。</div>';
-      document.querySelectorAll('[data-remove-agent]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();adminConfig.agents.splice(Number(btn.dataset.removeAgent),1);renderAgentEditor(adminConfig.agents,lastAgentStatuses)}));
+      if(installAgentIndex!==null&&(installAgentIndex<0||installAgentIndex>=agents.length))installAgentIndex=null;
+      $('agentEditor').innerHTML=agents.length?agents.map((a,i)=>'<div class="editor-card" data-agent-index="'+i+'"><div class="editor-head"><div><div class="editor-title">'+escapeHTML(a.name||a.id)+'</div><div class="editor-sub">'+escapeHTML(a.id||'')+' · '+escapeHTML(a.probeSource||'-')+'</div></div><div class="inline-actions"><button class="btn '+(installAgentIndex===i?'btn-primary':'')+'" data-install-agent="'+i+'">安装命令</button><button class="btn btn-danger" data-remove-agent="'+i+'">删除</button></div></div><div class="form-grid"><div class="field"><label>Agent ID</label><input data-agent-field="id" value="'+escapeHTML(a.id||'')+'"></div><div class="field"><label>显示名</label><input data-agent-field="name" value="'+escapeHTML(a.name||'')+'"></div><div class="field"><label>地区 / 探测源</label><input data-agent-field="probeSource" value="'+escapeHTML(a.probeSource||'')+'"></div><div class="field"><label>运营商</label><select data-agent-field="carrier">'+carrierOptions(a.carrier||'unknown')+'</select></div></div></div>').join(''):'<div class="empty">还没有配置 Agent。</div>';
+      document.querySelectorAll('[data-install-agent]').forEach(btn=>btn.addEventListener('click',()=>{installAgentIndex=Number(btn.dataset.installAgent);renderAgentEditor(adminConfig.agents,lastAgentStatuses);loadInstallCommand().catch(console.error)}));
+      document.querySelectorAll('[data-remove-agent]').forEach(btn=>btn.addEventListener('click',()=>{markSettingsDirty();const idx=Number(btn.dataset.removeAgent);adminConfig.agents.splice(idx,1);if(installAgentIndex===idx)installAgentIndex=null;else if(installAgentIndex!==null&&installAgentIndex>idx)installAgentIndex--;renderAgentEditor(adminConfig.agents,lastAgentStatuses);loadInstallCommand().catch(console.error)}));
       document.querySelectorAll('[data-agent-field]').forEach(el=>el.addEventListener('input',()=>{markSettingsDirty();loadInstallCommand().catch(console.error)}));
       renderDiscoveredAgents(statuses||[]);
     }
@@ -994,11 +999,13 @@
       await load();
     }
     async function loadInstallCommand(){
-      const first=collectAgents()[0]||{id:'',name:'',probeSource:'',carrier:'unknown'};
-      const q=new URLSearchParams({id:first.id||'',name:first.name||'',probe_source:first.probeSource||'',carrier:first.carrier||'unknown'});
+      const agents=collectAgents();
+      const selected=installAgentIndex===null?{id:'',name:'',probeSource:'',carrier:'unknown'}:(agents[installAgentIndex]||{id:'',name:'',probeSource:'',carrier:'unknown'});
+      const q=new URLSearchParams({id:selected.id||'',name:selected.name||'',probe_source:selected.probeSource||'',carrier:selected.carrier||'unknown'});
       const res=await fetch('/api/admin/install-command?'+q.toString(),{cache:'no-store'}).then(r=>r.json());
       $('installCommand').value=res.command||'';
-      $('installHint').textContent=res.tokenSet?'脚本会优先从当前主控下载 agent 二进制，失败后回落到 GitHub Release。':'主控还没有配置 Token，请先保存 Token 后再复制命令。';
+      if(!res.tokenSet){$('installHint').textContent='主控还没有配置 Token，请先保存 Token 后再复制命令。';return}
+      $('installHint').textContent=selected.id?'当前命令使用 '+selected.id+'，只适合重装或迁移这个 Agent。新增机器请用“新机器命令”。':'当前命令会在目标机器自动生成 agent-$(hostname -s)，适合新增 Agent。';
     }
     document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>switchSettingsTab(btn.dataset.tab)));
     $('settingsBtn').addEventListener('click',()=>showSettings('providers'));$('modalCancel').addEventListener('click',closeSettings);$('settingsModal').addEventListener('click',e=>{if(e.target===$('settingsModal'))closeSettings()});document.addEventListener('click',()=>closeToolSelects());document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeToolSelects();if($('curveModal').classList.contains('open'))closeCurve();else if($('settingsModal').classList.contains('open'))closeSettings()}});
@@ -1009,8 +1016,9 @@
     $('curveCarrier').addEventListener('change',()=>{curveState.carrier=$('curveCarrier').value;renderCurve()});
     $('reloadBtn').addEventListener('click',()=>load().catch(e=>toast(e.message,true)));
     $('addProviderBtn').addEventListener('click',()=>{markSettingsDirty();adminConfig.providers.push({id:'new-provider',name:'新机场',category:'默认',subscriptionUrl:'',subscriptionFile:''});renderProviders(adminConfig.providers,[])});
-    $('addAgentBtn').addEventListener('click',()=>{markSettingsDirty();const n=adminConfig.agents.length+1;adminConfig.agents.push({id:'agent-'+n,name:'新 Agent '+n,probeSource:'城市运营商',carrier:'unknown'});renderAgentEditor(adminConfig.agents,[]);loadInstallCommand().catch(console.error)});
+    $('addAgentBtn').addEventListener('click',()=>{markSettingsDirty();const n=adminConfig.agents.length+1;adminConfig.agents.push({id:'agent-'+n,name:'新 Agent '+n,probeSource:'城市运营商',carrier:'unknown'});installAgentIndex=adminConfig.agents.length-1;renderAgentEditor(adminConfig.agents,[]);loadInstallCommand().catch(console.error)});
     $('refreshDiscoveredAgentsBtn').addEventListener('click',()=>refreshDiscoveredAgents().catch(e=>toast(e.message,true)));
+    $('resetInstallBtn').addEventListener('click',()=>{installAgentIndex=null;renderAgentEditor(adminConfig.agents,lastAgentStatuses);loadInstallCommand().catch(console.error)});
     $('copyInstallBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('installCommand').value);toast('安装命令已复制')}catch(e){$('installCommand').select();toast('已选中命令，可手动复制')}});
     $('loadSubBtn').addEventListener('click',()=>loadProviderSubscription(false).catch(e=>toast(e.message,true)));
     $('fetchRemoteSubBtn').addEventListener('click',()=>loadProviderSubscription(true).catch(e=>toast(e.message,true)));
